@@ -96,6 +96,72 @@ export default function Home() {
   const [histoEleve, setHistoEleve] = useState<ReturnType<typeof lireNotesEleve>>([]);
 
   const fileInputGrilleRef = useRef<HTMLInputElement>(null);
+  const [autoLoadStatus, setAutoLoadStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [autoLoadMessage, setAutoLoadMessage] = useState<string>("");
+  const hasAutoLoaded = useRef(false);
+
+  // ===== CHARGEMENT AUTOMATIQUE AU DÉMARRAGE =====
+  // Si Drive est connecté (token en mémoire), charger le fichier automatiquement
+  useEffect(() => {
+    if (hasAutoLoaded.current) return;
+    if (!driveState.connected || !driveState.accessToken) return;
+    hasAutoLoaded.current = true;
+
+    const autoLoad = async () => {
+      setAutoLoadStatus("loading");
+      setAutoLoadMessage("Connexion à Google Drive…");
+      try {
+        // Chercher le fichier sur Drive
+        let fileId = driveState.fileId;
+        if (!fileId) {
+          setAutoLoadMessage(`Recherche de "${fichierNom}" sur Drive…`);
+          fileId = await findFileOnDrive(driveState.accessToken!, fichierNom);
+          if (!fileId) {
+            setAutoLoadStatus("error");
+            setAutoLoadMessage(`Fichier "${fichierNom}" introuvable sur Drive. Chargez-le manuellement.`);
+            return;
+          }
+        }
+        setAutoLoadMessage("Téléchargement du fichier…");
+        const buffer = await downloadFromDrive(driveState.accessToken!, fileId);
+        const grille = await lireFichierGrille(
+          new File([new Blob([buffer])], fichierNom, {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          })
+        );
+        setFichierGrille(grille);
+        if (grille.classes.length > 0) {
+          const premiereClasse = grille.classes[0];
+          setClasseSelectionnee(premiereClasse.nom);
+          setEleves(premiereClasse.eleves.map((e) => ({ nom: e.nom, prenom: e.prenom, classe: e.classe })));
+        }
+        const newState = { ...driveState, fileId };
+        setDriveState(newState);
+        saveDriveState(newState);
+        setAutoLoadStatus("done");
+        setAutoLoadMessage(``);
+        toast.success(
+          `☁️ Fichier chargé automatiquement depuis Drive (${grille.classes.reduce((s, c) => s + c.eleves.length, 0)} élèves).`
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Token expiré : déconnecter silencieusement
+        if (msg.includes("401") || msg.includes("403") || msg.includes("invalid_token")) {
+          const newState = { ...driveState, connected: false, accessToken: null };
+          setDriveState(newState);
+          saveDriveState(newState);
+          setAutoLoadStatus("idle");
+          setAutoLoadMessage("");
+        } else {
+          setAutoLoadStatus("error");
+          setAutoLoadMessage(`Erreur Drive : ${msg}`);
+        }
+      }
+    };
+
+    autoLoad();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Charger le fichier grille
   const handleImportGrille = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -588,7 +654,11 @@ export default function Home() {
             </h1>
             <p className="text-xs text-stone-400 mt-0.5">
               {competencesActives.length === 0
-                ? fichierGrille ? "Sélectionnez un élève et des compétences" : "Chargez le fichier de grille Excel pour commencer"
+                ? fichierGrille
+                  ? "Sélectionnez un élève et des compétences"
+                  : autoLoadStatus === "loading"
+                  ? autoLoadMessage
+                  : "Chargez le fichier de grille Excel pour commencer"
                 : `${competencesActives.length} compétence(s) · ${state.equipement || "Équipement non renseigné"} · ${state.date}`}
             </p>
           </div>
@@ -614,33 +684,78 @@ export default function Home() {
         {/* Contenu */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {!fichierGrille ? (
-            /* État initial — pas de fichier */
+            /* État initial — chargement automatique ou invitation manuelle */
             <div className="flex flex-col items-center justify-center py-24 rounded-2xl" style={{ background: "white", border: "2px dashed #E7E5E4" }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#EFF6FF" }}>
-                <Upload size={28} color="#2563EB" />
-              </div>
-              <h2 className="text-lg font-semibold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
-                Chargez votre fichier de grille
-              </h2>
-              <p className="text-sm text-stone-400 text-center max-w-sm mb-6">
-                Cliquez sur <strong>« Charger fichier Excel »</strong> dans le panneau gauche pour charger votre fichier <code>grilleévaluationApplication.xlsx</code>.
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => fileInputGrilleRef.current?.click()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-                  style={{ background: "#2563EB", color: "white" }}
-                >
-                  <Upload size={14} /> Charger le fichier Excel
-                </button>
-                {driveState.connected && (
-                  <button onClick={handleLoadFromDrive} disabled={isSyncingDrive}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-                    style={{ background: "#F5F5F4", color: "#292524" }}
-                  >
-                    <Cloud size={14} /> Charger depuis Drive
-                  </button>
-                )}
-              </div>
+              {autoLoadStatus === "loading" ? (
+                /* Chargement automatique en cours */
+                <>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#EFF6FF" }}>
+                    <RefreshCw size={28} color="#2563EB" className="animate-spin" />
+                  </div>
+                  <h2 className="text-lg font-semibold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+                    Chargement depuis Google Drive…
+                  </h2>
+                  <p className="text-sm text-stone-400 text-center max-w-sm">
+                    {autoLoadMessage}
+                  </p>
+                </>
+              ) : autoLoadStatus === "error" ? (
+                /* Erreur de chargement automatique */
+                <>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#FEF2F2" }}>
+                    <CloudOff size={28} color="#DC2626" />
+                  </div>
+                  <h2 className="text-lg font-semibold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+                    Chargement automatique échoué
+                  </h2>
+                  <p className="text-sm text-center max-w-sm mb-4" style={{ color: "#DC2626" }}>
+                    {autoLoadMessage}
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={handleLoadFromDrive}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                      style={{ background: "#2563EB", color: "white" }}
+                    >
+                      <RefreshCw size={14} /> Réessayer depuis Drive
+                    </button>
+                    <button onClick={() => fileInputGrilleRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                      style={{ background: "#F5F5F4", color: "#292524" }}
+                    >
+                      <Upload size={14} /> Charger localement
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Pas de Drive connecté — invitation manuelle */
+                <>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "#EFF6FF" }}>
+                    <Upload size={28} color="#2563EB" />
+                  </div>
+                  <h2 className="text-lg font-semibold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+                    Chargez votre fichier de grille
+                  </h2>
+                  <p className="text-sm text-stone-400 text-center max-w-sm mb-6">
+                    Connectez Google Drive pour un chargement automatique, ou chargez le fichier <code>grilleévaluationApplication.xlsx</code> manuellement.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => fileInputGrilleRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                      style={{ background: "#2563EB", color: "white" }}
+                    >
+                      <Upload size={14} /> Charger le fichier Excel
+                    </button>
+                    {driveState.connected && (
+                      <button onClick={handleLoadFromDrive} disabled={isSyncingDrive}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                        style={{ background: "#F5F5F4", color: "#292524" }}
+                      >
+                        <Cloud size={14} /> Charger depuis Drive
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ) : competencesActives.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 rounded-2xl" style={{ background: "white", border: "2px dashed #E7E5E4" }}>

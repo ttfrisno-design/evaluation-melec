@@ -55,6 +55,8 @@ import RecapitulatifNote from "@/components/RecapitulatifNote";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
+// Client ID Google OAuth2 pré-configuré pour RMQUENEAU@gmail.com
+const GOOGLE_CLIENT_ID_DEFAULT = "481482019199-v7c87meflc0ns2b7985nq37c96t66djf.apps.googleusercontent.com";
 
 export default function Home() {
   const {
@@ -83,7 +85,7 @@ export default function Home() {
   const [driveState, setDriveState] = useState<DriveState>(loadDriveState());
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(
-    localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || ""
+    localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || GOOGLE_CLIENT_ID_DEFAULT
   );
   const [isSyncingDrive, setIsSyncingDrive] = useState(false);
 
@@ -825,31 +827,38 @@ export default function Home() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-3 rounded-xl text-sm" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-                  <p className="font-semibold text-blue-800 mb-1">Configuration requise</p>
-                  <p className="text-blue-600 text-xs">
-                    Pour synchroniser avec Google Drive, vous devez créer un projet Google Cloud et obtenir un Client ID OAuth2. 
-                    Consultez le guide d'utilisation (ℹ️) pour les étapes détaillées.
+                {/* Indicateur Client ID pré-configuré */}
+                <div className="p-3 rounded-xl text-sm" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
+                  <p className="font-semibold text-green-800 mb-0.5 flex items-center gap-1.5">
+                    <Check size={13} /> Client ID pré-configuré
+                  </p>
+                  <p className="text-green-700 text-xs font-mono break-all">
+                    {GOOGLE_CLIENT_ID_DEFAULT.slice(0, 30)}…
                   </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-600 mb-1.5">Client ID Google OAuth2</label>
-                  <input
-                    type="text" value={googleClientId} onChange={(e) => setGoogleClientId(e.target.value)}
-                    placeholder="xxxxxxx.apps.googleusercontent.com"
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ background: "#F5F5F4", border: "1px solid #E7E5E4", color: "#1C1917" }}
-                  />
-                </div>
-                <button onClick={handleConnectDrive} disabled={!googleClientId.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-40"
+                <button onClick={handleConnectDrive}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold shadow-sm"
                   style={{ background: "#2563EB", color: "white" }}
                 >
-                  <Cloud size={15} /> Se connecter à Google Drive
+                  <Cloud size={16} /> Se connecter à Google Drive
                 </button>
                 <p className="text-xs text-stone-400 text-center">
-                  Une fenêtre Google s'ouvrira pour autoriser l'accès à votre Drive.
+                  Une fenêtre Google s'ouvrira — connectez-vous avec <strong>RMQUENEAU@gmail.com</strong>.
                 </p>
+                {/* Option avanceée : modifier le Client ID */}
+                <details className="text-xs">
+                  <summary className="text-stone-400 cursor-pointer hover:text-stone-600 transition-colors">
+                    Modifier le Client ID (avancé)
+                  </summary>
+                  <div className="mt-2">
+                    <input
+                      type="text" value={googleClientId} onChange={(e) => setGoogleClientId(e.target.value)}
+                      placeholder="xxxxxxx.apps.googleusercontent.com"
+                      className="w-full px-3 py-2 rounded-lg text-xs outline-none mt-1"
+                      style={{ background: "#F5F5F4", border: "1px solid #E7E5E4", color: "#1C1917" }}
+                    />
+                  </div>
+                </details>
               </div>
             )}
           </div>

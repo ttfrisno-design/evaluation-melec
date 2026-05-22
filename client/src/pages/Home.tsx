@@ -71,6 +71,7 @@ export default function Home() {
     noteSur20,
     totalObtenu,
     totalMax,
+    totalCoefs,
     competencesActives,
     notesParCompetence,
   } = useEvaluation();
@@ -230,26 +231,20 @@ export default function Home() {
 
     setIsSaving(true);
     try {
-      // Construire les notes par compétence (note sur 20 pour chaque compétence évaluée)
+      // Notes par compétence sur 20 (déjà calculées par useEvaluation)
       const notesParComp: Record<string, number | null> = {};
-      for (const comp of competencesActives) {
-        const found = notesParCompetence.find((n) => n.comp.code === comp.code);
-        if (found && found.max > 0) {
-          // Convertir en note sur 20
-          const sur20 = Math.round((found.obtenu / found.max) * 20 * 100) / 100;
-          notesParComp[comp.code] = sur20;
-        } else {
-          notesParComp[comp.code] = null;
-        }
+      for (const n of notesParCompetence) {
+        notesParComp[n.comp.code] = n.sur20;
       }
 
-      // Mettre à jour le workbook
+      // Mettre à jour le workbook avec notes /20 + note globale /20
       const wbMaj = ecrireNotesEleve(
         fichierGrille.rawWorkbook,
         eleveSelectionneInfo,
         notesParComp,
         state.equipement,
-        state.date
+        state.date,
+        noteSur20  // note globale pondérée /20
       );
 
       // Mettre à jour l'état local
@@ -775,7 +770,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <RecapitulatifNote noteSur20={noteSur20} totalObtenu={totalObtenu} totalMax={totalMax} notesParCompetence={notesParCompetence} />
+              <RecapitulatifNote noteSur20={noteSur20} totalObtenu={totalObtenu} totalMax={totalMax} totalCoefs={totalCoefs} notesParCompetence={notesParCompetence} />
               {competencesActives.map((comp) => (
                 <TableauCompetence key={comp.id} competence={comp} notes={state.notes} onNoteChange={setNote} />
               ))}

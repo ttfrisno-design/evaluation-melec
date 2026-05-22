@@ -1,6 +1,7 @@
 // Hook principal de gestion de l'évaluation MELEC
+// Calcul : note /20 par compétence + note globale pondérée /20
 import { useState, useCallback } from "react";
-import { COMPETENCES, calculerNoteSur20, calculerNoteCompetence } from "@/lib/competences";
+import { COMPETENCES, calculerNoteGlobale, calculerNoteCompetence } from "@/lib/competences";
 
 export interface Eleve {
   nom: string;
@@ -14,7 +15,7 @@ export interface EvaluationState {
   equipement: string;
   date: string;
   competencesSelectionnees: string[]; // codes C1, C2, ...
-  notes: Record<string, number | null>; // critereId -> note
+  notes: Record<string, number | null>; // critereId -> note brute saisie
 }
 
 export function useEvaluation() {
@@ -74,20 +75,34 @@ export function useEvaluation() {
     }));
   }, []);
 
-  // Calculs dérivés
-  const { noteSur20, totalObtenu, totalMax } = calculerNoteSur20(
-    state.competencesSelectionnees,
-    state.notes
-  );
+  // ── Calculs dérivés ──────────────────────────────────────────
 
+  // Compétences actives (objets complets)
   const competencesActives = COMPETENCES.filter((c) =>
     state.competencesSelectionnees.includes(c.code)
   );
 
-  const notesParCompetence = competencesActives.map((comp) => ({
-    comp,
-    ...calculerNoteCompetence(comp, state.notes),
-  }));
+  // Note globale pondérée sur 20 + détails par compétence
+  const { noteGlobale, notesParComp, totalCoefs } = calculerNoteGlobale(
+    state.competencesSelectionnees,
+    state.notes
+  );
+
+  // Détails enrichis par compétence (pour l'affichage)
+  const notesParCompetence = competencesActives.map((comp) => {
+    const detail = notesParComp.find((n) => n.code === comp.code);
+    return {
+      comp,
+      obtenu: detail?.obtenu ?? 0,
+      max: detail?.max ?? comp.noteMax,
+      sur20: detail?.sur20 ?? null,
+      coef: comp.coef,
+    };
+  });
+
+  // Totaux bruts (pour l'affichage de la barre de progression)
+  const totalObtenu = notesParComp.reduce((s, n) => s + n.obtenu, 0);
+  const totalMax = notesParComp.reduce((s, n) => s + n.max, 0);
 
   return {
     state,
@@ -99,9 +114,11 @@ export function useEvaluation() {
     setNote,
     resetNotes,
     resetAll,
-    noteSur20,
+    // Note globale pondérée sur 20
+    noteSur20: noteGlobale,
     totalObtenu,
     totalMax,
+    totalCoefs,
     competencesActives,
     notesParCompetence,
   };

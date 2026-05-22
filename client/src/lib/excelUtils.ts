@@ -121,12 +121,15 @@ function trouverBlocDisponible(
 }
 
 // Écrire les notes d'un élève dans le fichier Excel
+// - notesParCompetence : note /20 par compétence (C1, C2...)
+// - noteGlobale : note globale pondérée /20, écrite sous C13
 export function ecrireNotesEleve(
   wb: XLSX.WorkBook,
   eleve: EleveInfo,
-  notesParCompetence: Record<string, number | null>, // C1 -> note sur 20
+  notesParCompetence: Record<string, number | null>, // C1 -> note /20
   equipement: string,
-  date: string
+  date: string,
+  noteGlobale: number | null = null // note globale /20 à écrire sous C13
 ): XLSX.WorkBook {
   const ws = wb.Sheets[eleve.classe];
   if (!ws) return wb;
@@ -166,16 +169,26 @@ export function ecrireNotesEleve(
     rows[rowIdx][colReelle] = note !== null && note !== undefined ? note : null;
   }
 
-  // Ajouter une ligne de métadonnées (date + équipement) dans la ligne vide avant le bloc si possible
-  // On utilise la ligne vide juste avant le bloc pour stocker date/équipement
+  // Ajouter une ligne de métadonnées (date + équipement) dans la ligne vide avant le bloc
   const metaRowIdx = blocStart - 1;
   if (metaRowIdx >= 0) {
     while (rows.length <= metaRowIdx) {
       rows.push(new Array(rows[0]?.length || 15).fill(null));
     }
-    // Stocker date + équipement dans la cellule de l'élève sur la ligne vide
     rows[metaRowIdx][colReelle] = `${date} | ${equipement}`;
   }
+
+  // Écrire la note globale /20 dans la ligne juste après C13 (index blocStart + 13)
+  // Structure : ligne vide séparateur + étiquette "Note /20" en col 0
+  const noteGlobaleRowIdx = blocStart + CODES_COMPETENCES.length; // ligne après C13
+  while (rows.length <= noteGlobaleRowIdx) {
+    rows.push(new Array(rows[0]?.length || 15).fill(null));
+  }
+  // Étiquette en colonne 0 (seulement si pas déjà remplie)
+  if (!rows[noteGlobaleRowIdx][0]) {
+    rows[noteGlobaleRowIdx][0] = "Note globale /20";
+  }
+  rows[noteGlobaleRowIdx][colReelle] = noteGlobale !== null ? noteGlobale : null;
 
   // Reconstruire la feuille
   const newWs = XLSX.utils.aoa_to_sheet(rows);

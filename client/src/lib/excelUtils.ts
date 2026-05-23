@@ -51,6 +51,7 @@ export interface EntreeEvaluation {
   classe: string;
   notesParCompetence: Record<string, number | null>; // C1 -> note /20
   noteGlobale: number | null;
+  commentaire?: string; // commentaire optionnel
 }
 
 export interface BlocEvaluation {
@@ -285,6 +286,7 @@ function _mettreAJourOngletEleve(
   const bloc: (string | number | null)[][] = [];
   bloc.push(["Date", date]);
   if (equipement) bloc.push(["Équipement", equipement]);
+  if (entree.commentaire?.trim()) bloc.push(["Commentaire", entree.commentaire.trim()]);
 
   for (const code of CODES_COMPETENCES) {
     const note = notesParCompetence[code];
@@ -347,6 +349,8 @@ export function lireEvaluationsEleve(
 
         if (lbl.toLowerCase() === "équipement") {
           equipement = String(val || "");
+        } else if (lbl.toLowerCase() === "commentaire") {
+          // commentaire ignoré dans la lecture des blocs (non utilisé pour le calcul)
         } else if (lbl.toLowerCase() === "note /20") {
           noteGlobale = val !== null && val !== "" ? Number(val) : null;
         } else if (CODES_COMPETENCES.includes(lbl)) {

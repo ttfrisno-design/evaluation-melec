@@ -115,6 +115,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showHistoEleve, setShowHistoEleve] = useState(false);
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [commentaire, setCommentaire] = useState("");
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
     notesParComp: Record<string, number | null>;
@@ -259,6 +260,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       notesParComp[n.comp.code] = n.sur20;
     }
     setConfirmData({ notesParComp });
+    setCommentaire(""); // réinitialiser le commentaire à chaque ouverture
     setShowConfirmation(true);
   };
 
@@ -276,6 +278,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
         classe: eleveSelectionneInfo.classe,
         notesParCompetence: confirmData.notesParComp,
         noteGlobale: noteSur20,
+        commentaire: commentaire.trim() || undefined,
       });
 
       setFichierGrille({ ...fichierGrille, rawWorkbook: wbMaj });
@@ -1080,6 +1083,32 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                       );
                     })}
                 </div>
+              </div>
+
+              {/* Commentaire optionnel */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wide mb-1.5">
+                  Commentaire <span className="normal-case font-normal text-stone-300">(optionnel)</span>
+                </label>
+                <textarea
+                  value={commentaire}
+                  onChange={(e) => setCommentaire(e.target.value)}
+                  placeholder="Ex : Bon travail sur la sécurité, à revoir le schéma…"
+                  rows={2}
+                  maxLength={300}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none transition-all"
+                  style={{
+                    background: "#FAFAF9",
+                    border: `1.5px solid ${commentaire ? "#2563EB" : "#E7E5E4"}`,
+                    color: "#1C1917",
+                    lineHeight: "1.5",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
+                  onBlur={(e) => (e.target.style.borderColor = commentaire ? "#2563EB" : "#E7E5E4")}
+                />
+                {commentaire && (
+                  <p className="text-xs text-stone-400 mt-1 text-right">{commentaire.length}/300</p>
+                )}
               </div>
 
               {/* Note globale */}

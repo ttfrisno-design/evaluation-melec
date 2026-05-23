@@ -25,8 +25,10 @@ import {
   User,
   Calendar,
   Wrench,
+  FileText,
 } from "lucide-react";
 import { noteGradientColor } from "@/lib/noteColor";
+import { exporterBulletinPDF } from "@/lib/pdfBulletin";
 
 interface Props {
   fichierGrille: FichierGrille | null;
@@ -397,6 +399,24 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                     <p className="text-xs text-stone-400">/ 20 — {getMention(eleveSelectionne.noteGlobale)}</p>
                   </div>
                 )}
+                {/* Bouton export PDF */}
+                <button
+                  onClick={() => exporterBulletinPDF({
+                    nom: eleveSelectionne.nom,
+                    prenom: eleveSelectionne.prenom,
+                    classe: eleveSelectionne.classe,
+                    evaluations: eleveSelectionne.toutesEvaluations,
+                    notesParCompetence: eleveSelectionne.notesParComp,
+                    noteGlobale: eleveSelectionne.noteGlobale,
+                    commentaire: eleveSelectionne.dernierCommentaire,
+                    date: eleveSelectionne.derniereDate,
+                  })}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE" }}
+                  title="Exporter le bulletin PDF"
+                >
+                  <FileText size={12} /> PDF
+                </button>
                 <button onClick={() => { setEleveSelectionne(null); setRecherche(""); }}
                   className="w-7 h-7 flex items-center justify-center rounded-lg"
                   style={{ background: "#DBEAFE", color: "#2563EB" }}>

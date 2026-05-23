@@ -52,9 +52,11 @@ import {
   Users,
   RefreshCw,
   BarChart2,
+  FileText,
 } from "lucide-react";
 import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
+import { exporterBulletinPDF } from "@/lib/pdfBulletin";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
@@ -693,6 +695,31 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
           </div>
           <div className="flex items-center gap-3">
             {/* Bouton tableau de bord */}
+            {/* Bouton export PDF */}
+            {eleveSelectionneInfo && competencesActives.length > 0 && (
+              <button
+                onClick={() => exporterBulletinPDF({
+                  nom: eleveSelectionneInfo.nom,
+                  prenom: eleveSelectionneInfo.prenom,
+                  classe: eleveSelectionneInfo.classe,
+                  evaluations: histoEleve,
+                  date: state.date,
+                  equipement: state.equipement,
+                  notesParCompetence: Object.fromEntries(
+                    notesParCompetence.map((n) => [n.comp.code, n.sur20])
+                  ),
+                  noteGlobale: noteSur20,
+                  commentaire: commentaire,
+                  totalCoefs: totalCoefs,
+                })}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#292524", border: "1px solid #E7E5E4" }}
+                title="Exporter le bulletin PDF de l'élève"
+              >
+                <FileText size={14} />
+                Bulletin PDF
+              </button>
+            )}
             {fichierGrille && onShowDashboard && (
               <button
                 onClick={onShowDashboard}

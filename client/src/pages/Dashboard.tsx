@@ -489,6 +489,110 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                 </div>
               )}
 
+              {/* Graphique d'évolution E2 / E31 / E32 */}
+              {eleveSelectionne.toutesEvaluations.length >= 1 && (() => {
+                const evals = eleveSelectionne.toutesEvaluations;
+                // Calculer E2/E31/E32 pour chaque évaluation
+                const series = evals.map((ev, i) => ({
+                  label: ev.date || `Éval ${i + 1}`,
+                  resultats: calculerNotesEpreuves(ev.notes),
+                  noteGlobale: ev.noteGlobale,
+                }));
+
+                const W = 480, H = 140, PAD_L = 32, PAD_R = 16, PAD_T = 12, PAD_B = 28;
+                const chartW = W - PAD_L - PAD_R;
+                const chartH = H - PAD_T - PAD_B;
+                const n = series.length;
+                const xStep = n > 1 ? chartW / (n - 1) : chartW / 2;
+
+                const toY = (val: number | null) =>
+                  val === null ? null : PAD_T + chartH - (val / 20) * chartH;
+
+                const couleurs: Record<string, string> = { E2: "#2563EB", E31: "#7C3AED", E32: "#BE185D", global: "#d97706" };
+                const series_lines = [
+                  { id: "E2",     label: "E2",      vals: series.map((s) => s.resultats.find((r) => r.id === "E2")?.note ?? null) },
+                  { id: "E31",    label: "E31",     vals: series.map((s) => s.resultats.find((r) => r.id === "E31")?.note ?? null) },
+                  { id: "E32",    label: "E32",     vals: series.map((s) => s.resultats.find((r) => r.id === "E32")?.note ?? null) },
+                  { id: "global", label: "Globale", vals: series.map((s) => s.noteGlobale) },
+                ];
+
+                const buildPath = (vals: (number | null)[]) => {
+                  const pts = vals.map((v, i) => ({ x: PAD_L + i * xStep, y: toY(v) })).filter((p) => p.y !== null);
+                  if (pts.length < 2) return null;
+                  return pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${(p.y as number).toFixed(1)}`).join(" ");
+                };
+
+                const gridLines = [0, 5, 10, 15, 20];
+
+                return (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Progression E2 / E31 / E32</p>
+                    <div className="rounded-xl p-3" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+                        {/* Grille horizontale */}
+                        {gridLines.map((v) => {
+                          const y = toY(v) as number;
+                          return (
+                            <g key={v}>
+                              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#E7E5E4" strokeWidth="0.5" strokeDasharray={v === 10 ? "4,2" : "2,2"} />
+                              <text x={PAD_L - 4} y={y + 3.5} textAnchor="end" fontSize="8" fill="#A8A29E">{v}</text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Lignes verticales (une par évaluation) */}
+                        {series.map((_, i) => (
+                          <line key={i} x1={PAD_L + i * xStep} y1={PAD_T} x2={PAD_L + i * xStep} y2={PAD_T + chartH} stroke="#F5F5F4" strokeWidth="1" />
+                        ))}
+
+                        {/* Courbes */}
+                        {series_lines.map((line) => {
+                          const path = buildPath(line.vals);
+                          if (!path) return null;
+                          return (
+                            <g key={line.id}>
+                              <path d={path} fill="none" stroke={couleurs[line.id]} strokeWidth={line.id === "global" ? 1.5 : 2}
+                                strokeDasharray={line.id === "global" ? "4,2" : undefined} strokeLinecap="round" strokeLinejoin="round" />
+                              {/* Points */}
+                              {line.vals.map((v, i) => {
+                                if (v === null) return null;
+                                const cx = PAD_L + i * xStep;
+                                const cy = toY(v) as number;
+                                return (
+                                  <g key={i}>
+                                    <circle cx={cx} cy={cy} r={3.5} fill={couleurs[line.id]} stroke="white" strokeWidth={1.5} />
+                                    <text x={cx} y={cy - 6} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={couleurs[line.id]}>
+                                      {v.toFixed(1)}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </g>
+                          );
+                        })}
+
+                        {/* Labels axe X */}
+                        {series.map((s, i) => (
+                          <text key={i} x={PAD_L + i * xStep} y={H - 4} textAnchor="middle" fontSize="8" fill="#78716C">
+                            {s.label.length > 10 ? s.label.slice(5) : s.label}
+                          </text>
+                        ))}
+                      </svg>
+
+                      {/* Légende */}
+                      <div className="flex flex-wrap gap-3 mt-2 justify-center">
+                        {series_lines.map((line) => (
+                          <div key={line.id} className="flex items-center gap-1.5">
+                            <div className="w-5 h-0.5 rounded" style={{ background: couleurs[line.id], borderTop: line.id === "global" ? `2px dashed ${couleurs[line.id]}` : undefined }} />
+                            <span className="text-xs font-semibold" style={{ color: couleurs[line.id] }}>{line.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Historique des évaluations */}
               {eleveSelectionne.toutesEvaluations.length > 1 && (
                 <div>

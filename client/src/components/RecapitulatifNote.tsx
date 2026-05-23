@@ -45,16 +45,16 @@ export default function RecapitulatifNote({
 
   return (
     <div
-      className="rounded-xl p-5 shadow-sm"
+      className="rounded-2xl p-4 lg:p-5 shadow-sm"
       style={{ background: "white", border: "1px solid #E7E5E4" }}
     >
-      <div className="flex items-start gap-6">
+      <div className="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
         {/* Note globale sur 20 */}
         {(() => {
           const { bg, text, border } = noteGradientColor(noteSur20);
           return (
             <div
-              className="flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-8 py-5"
+              className="flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-6 sm:px-8 py-4 sm:py-5 w-full sm:w-auto"
               style={{
                 background: noteSur20 !== null ? bg : "#F5F5F4",
                 border: `2px solid ${noteSur20 !== null ? border : "#E7E5E4"}`,

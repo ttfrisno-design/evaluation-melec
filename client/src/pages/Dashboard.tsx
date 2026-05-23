@@ -305,20 +305,21 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
     <div className="flex-1 flex flex-col min-w-0 bg-stone-50" style={{ fontFamily: "'Inter', sans-serif" }}>
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b bg-white gap-4" style={{ borderColor: "#E7E5E4" }}>
-        <div className="flex items-center gap-4 flex-shrink-0">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 lg:px-6 py-3 lg:py-4 border-b bg-white gap-3" style={{ borderColor: "#E7E5E4" }}>
+        <div className="flex items-center gap-3 flex-shrink-0">
           <button onClick={onRetour} className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800 transition-colors">
-            <ArrowLeft size={15} /> Retour
+            <ArrowLeft size={15} />
+            <span className="hidden sm:inline">Retour</span>
           </button>
           <div className="w-px h-5 bg-stone-200" />
-          <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
-            Tableau de bord —{" "}
+          <h1 className="text-base lg:text-xl font-bold tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+            <span className="hidden sm:inline">Tableau de bord — </span>
             <span style={{ color: "#2563EB" }}>{classeActive}</span>
           </h1>
         </div>
 
         {/* ── Barre de recherche ── */}
-        <div className="flex-1 max-w-md relative">
+        <div className="w-full sm:flex-1 sm:max-w-md relative">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all"
             style={{
@@ -398,7 +399,7 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-5">
 
         {/* ── Fiche élève (si sélectionné via recherche) ── */}
         {eleveSelectionne && (
@@ -633,7 +634,7 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
         )}
 
         {/* ── Cartes statistiques ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <div className="rounded-xl p-4 bg-white shadow-sm" style={{ border: "1px solid #E7E5E4" }}>
             <div className="flex items-center gap-2 mb-2">
               <Users size={16} color="#2563EB" />

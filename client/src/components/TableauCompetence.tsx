@@ -115,7 +115,7 @@ export default function TableauCompetence({ competence, notes, onNoteChange }: P
 
       {/* Corps du tableau */}
       {!collapsed && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-3 lg:mx-0">
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: "#FAFAF9", borderBottom: "1px solid #E7E5E4" }}>

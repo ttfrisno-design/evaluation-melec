@@ -118,6 +118,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showInfo, setShowInfo] = useState(false);
   const [showHistoEleve, setShowHistoEleve] = useState(false);
   const [showGestionEleves, setShowGestionEleves] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // drawer mobile
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [commentaire, setCommentaire] = useState("");
@@ -476,19 +477,49 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
 
   return (
     <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif", background: "#FAFAF9" }}>
+
+      {/* ===== OVERLAY MOBILE ===== */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ===== SIDEBAR GAUCHE ===== */}
-      <aside className="w-80 flex-shrink-0 flex flex-col" style={{ background: "#292524", color: "#F5F5F4", minHeight: "100vh" }}>
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-80 flex-shrink-0 flex flex-col
+          transform transition-transform duration-300 ease-in-out
+          lg:relative lg:translate-x-0 lg:z-auto
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+        style={{ background: "#292524", color: "#F5F5F4", minHeight: "100vh" }}
+      >
         {/* Logo */}
-        <div className="px-6 py-5 border-b border-stone-700">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#2563EB" }}>
-              <Zap size={16} color="white" />
+        <div className="px-5 py-4 border-b border-stone-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#2563EB" }}>
+                <Zap size={16} color="white" />
+              </div>
+              <div>
+                <span className="font-bold text-base tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  MELEC Éval
+                </span>
+                <p className="text-xs text-stone-400">Grille d'évaluation</p>
+              </div>
             </div>
-            <span className="font-bold text-lg tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              MELEC Éval
-            </span>
+            {/* Bouton fermeture mobile */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg"
+              style={{ background: "#3C3836", color: "#A8A29E" }}
+            >
+              <X size={15} />
+            </button>
           </div>
-          <p className="text-xs text-stone-400 ml-11">Grille d'évaluation professionnelle</p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
@@ -706,30 +737,36 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       </aside>
 
       {/* ===== ZONE PRINCIPALE ===== */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 lg:ml-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 border-b" style={{ background: "white", borderColor: "#E7E5E4" }}>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
-              Grille d'Évaluation
-              {eleveSelectionneInfo && (
-                <span style={{ color: "#2563EB" }}>
-                  {" "}— {eleveSelectionneInfo.nom} {eleveSelectionneInfo.prenom}
-                  <span className="text-sm font-normal text-stone-400 ml-2">({classeSelectionnee})</span>
-                </span>
-              )}
-            </h1>
-            <p className="text-xs text-stone-400 mt-0.5">
-              {competencesActives.length === 0
-                ? fichierGrille
-                  ? "Sélectionnez un élève et des compétences"
-                  : autoLoadStatus === "loading"
-                  ? autoLoadMessage
-                  : "Chargez le fichier de grille Excel pour commencer"
-                : `${competencesActives.length} compétence(s) · ${state.equipement || "Équipement non renseigné"} · ${state.date}`}
-            </p>
+        <header className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b" style={{ background: "white", borderColor: "#E7E5E4" }}>
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Bouton hamburger mobile */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg"
+              style={{ background: "#292524", color: "white" }}
+            >
+              <BookOpen size={16} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-base lg:text-xl font-bold tracking-tight truncate" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+                {eleveSelectionneInfo
+                  ? `${eleveSelectionneInfo.nom} ${eleveSelectionneInfo.prenom}`
+                  : "Grille d'Évaluation"}
+              </h1>
+              <p className="text-xs text-stone-400 mt-0.5 truncate">
+                {competencesActives.length === 0
+                  ? fichierGrille
+                    ? "Sélectionnez un élève et des compétences"
+                    : autoLoadStatus === "loading"
+                    ? autoLoadMessage
+                    : "Chargez le fichier de grille Excel"
+                  : `${competencesActives.length} comp. · ${state.equipement || "Équipement"} · ${state.date}`}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Bouton tableau de bord */}
             {/* Bouton export PDF */}
             {eleveSelectionneInfo && competencesActives.length > 0 && (
@@ -748,23 +785,23 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                   commentaire: commentaire,
                   totalCoefs: totalCoefs,
                 })}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{ background: "#F5F5F4", color: "#292524", border: "1px solid #E7E5E4" }}
                 title="Exporter le bulletin PDF de l'élève"
               >
                 <FileText size={14} />
-                Bulletin PDF
+                <span className="hidden sm:inline">Bulletin PDF</span>
               </button>
             )}
             {fichierGrille && onShowDashboard && (
               <button
                 onClick={onShowDashboard}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{ background: "#F5F5F4", color: "#292524", border: "1px solid #E7E5E4" }}
                 title="Tableau de bord de la classe"
               >
                 <BarChart2 size={14} />
-                Tableau de bord
+                <span className="hidden sm:inline">Tableau de bord</span>
               </button>
             )}
             <button onClick={() => setShowInfo(true)}
@@ -776,17 +813,18 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             <button
               onClick={handleEnregistrer}
               disabled={isSaving || !eleveSelectionneInfo || competencesActives.length === 0 || !fichierGrille}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
               style={{ background: "#2563EB", color: "white" }}
             >
               <Download size={14} />
-              {isSaving ? "Enregistrement…" : driveState.connected ? "Enregistrer & Sync Drive" : "Enregistrer Excel"}
+              <span className="hidden sm:inline">{isSaving ? "Enregistrement…" : driveState.connected ? "Enregistrer & Sync" : "Enregistrer Excel"}</span>
+              <span className="sm:hidden">{isSaving ? "…" : "Sauver"}</span>
             </button>
           </div>
         </header>
 
         {/* Contenu */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6">
           {!fichierGrille ? (
             /* État initial — chargement automatique ou invitation manuelle */
             <div className="flex flex-col items-center justify-center py-24 rounded-2xl" style={{ background: "white", border: "2px dashed #E7E5E4" }}>
@@ -1068,8 +1106,8 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
           onClick={() => setShowConfirmation(false)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
-            style={{ background: "white" }}
+            className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ background: "white", maxHeight: "90vh" }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* En-tête */}
@@ -1097,7 +1135,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             </div>
 
             {/* Corps */}
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-4 lg:px-6 py-4 lg:py-5 space-y-4 overflow-y-auto flex-1">
 
               {/* Informations élève */}
               <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>

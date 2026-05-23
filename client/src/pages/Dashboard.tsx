@@ -26,6 +26,7 @@ import {
   Calendar,
   Wrench,
 } from "lucide-react";
+import { noteGradientColor } from "@/lib/noteColor";
 
 interface Props {
   fichierGrille: FichierGrille | null;
@@ -45,21 +46,11 @@ interface DonneeEleve {
 }
 
 function couleurNote(note: number | null): string {
-  if (note === null) return "#D1D5DB";
-  if (note >= 16) return "#16a34a";
-  if (note >= 14) return "#2563EB";
-  if (note >= 12) return "#7C3AED";
-  if (note >= 10) return "#d97706";
-  return "#dc2626";
+  return noteGradientColor(note).text;
 }
 
 function bgNote(note: number | null): string {
-  if (note === null) return "#F9FAFB";
-  if (note >= 16) return "#F0FDF4";
-  if (note >= 14) return "#EFF6FF";
-  if (note >= 12) return "#F5F3FF";
-  if (note >= 10) return "#FFFBEB";
-  return "#FEF2F2";
+  return noteGradientColor(note).bg;
 }
 
 function getMention(note: number | null): string {

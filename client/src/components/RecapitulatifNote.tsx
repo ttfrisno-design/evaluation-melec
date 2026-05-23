@@ -6,6 +6,7 @@
  * Design: Dashboard Technique Compact
  */
 import type { Competence } from "@/lib/competences";
+import { noteGradientColor } from "@/lib/noteColor";
 
 interface NoteCompetence {
   comp: Competence;
@@ -49,40 +50,42 @@ export default function RecapitulatifNote({
     >
       <div className="flex items-start gap-6">
         {/* Note globale sur 20 */}
-        <div
-          className="flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-8 py-5"
-          style={{
-            background: noteSur20 !== null ? "#EFF6FF" : "#F5F5F4",
-            border: `2px solid ${noteSur20 !== null ? "#2563EB" : "#E7E5E4"}`,
-            minWidth: "140px",
-          }}
-        >
-          <span
-            className="text-5xl font-black tabular-nums leading-none"
-            style={{
-              fontFamily: "'Outfit', sans-serif",
-              color: noteSur20 !== null ? "#2563EB" : "#D6D3D1",
-            }}
-          >
-            {noteSur20 !== null ? noteSur20.toFixed(2) : "—"}
-          </span>
-          <span className="text-sm font-semibold mt-1" style={{ color: "#78716C" }}>
-            / 20
-          </span>
-          {mention && (
-            <span
-              className="mt-2 text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: `${mention.color}15`, color: mention.color }}
+        {(() => {
+          const { bg, text, border } = noteGradientColor(noteSur20);
+          return (
+            <div
+              className="flex-shrink-0 flex flex-col items-center justify-center rounded-2xl px-8 py-5"
+              style={{
+                background: noteSur20 !== null ? bg : "#F5F5F4",
+                border: `2px solid ${noteSur20 !== null ? border : "#E7E5E4"}`,
+                minWidth: "140px",
+              }}
             >
-              {mention.label}
-            </span>
-          )}
-          {totalCoefs > 0 && (
-            <span className="mt-1 text-xs text-stone-400">
-              Σ coef = {totalCoefs}
-            </span>
-          )}
-        </div>
+              <span
+                className="text-5xl font-black tabular-nums leading-none"
+                style={{ fontFamily: "'Outfit', sans-serif", color: noteSur20 !== null ? text : "#D6D3D1" }}
+              >
+                {noteSur20 !== null ? noteSur20.toFixed(2) : "—"}
+              </span>
+              <span className="text-sm font-semibold mt-1" style={{ color: noteSur20 !== null ? text : "#78716C", opacity: 0.75 }}>
+                / 20
+              </span>
+              {mention && (
+                <span
+                  className="mt-2 text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: `${border}40`, color: text }}
+                >
+                  {mention.label}
+                </span>
+              )}
+              {totalCoefs > 0 && (
+                <span className="mt-1 text-xs" style={{ color: text, opacity: 0.6 }}>
+                  Σ coef = {totalCoefs}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Détails par compétence */}
         <div className="flex-1 min-w-0">
@@ -121,57 +124,35 @@ export default function RecapitulatifNote({
             <div className="flex flex-wrap gap-2">
               {notesParCompetence.map(({ comp, sur20, coef }) => {
                 const couleur = comp.couleur;
-                return (
-                  <div
-                    key={comp.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
-                    style={{
-                      background: `${couleur}10`,
-                      border: `1px solid ${couleur}30`,
-                    }}
-                  >
-                    {/* Pastille couleur */}
-                    <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ background: couleur }}
-                    />
-                    {/* Code compétence */}
-                    <span style={{ color: couleur }}>{comp.code}</span>
-                    {/* Poids sur 240 */}
-                    <span
-                      className="px-1 rounded text-[10px] font-bold"
-                      style={{ background: `${couleur}20`, color: couleur }}
-                    >
-                      {coef}pts
-                    </span>
-                    <span className="text-stone-400">:</span>
-                    {/* Note sur 20 */}
-                    <span
-                      className="tabular-nums font-bold"
-                      style={{ color: "#1C1917" }}
-                    >
-                      {sur20 !== null ? (
-                        <>
-                          <span
-                            style={{
-                              color:
-                                sur20 >= 16
-                                  ? "#16a34a"
-                                  : sur20 >= 10
-                                  ? "#2563EB"
-                                  : "#dc2626",
-                            }}
-                          >
-                            {sur20.toFixed(2)}
+                    const { bg: noteBg, text: noteText, border: noteBorder } = noteGradientColor(sur20);
+                    return (
+                      <div
+                        key={comp.id}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                        style={{
+                          background: sur20 !== null ? noteBg : `${couleur}08`,
+                          border: `1px solid ${sur20 !== null ? noteBorder : `${couleur}25`}`,
+                        }}
+                      >
+                        {/* Pastille couleur compétence */}
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: couleur }} />
+                        {/* Code */}
+                        <span style={{ color: couleur }}>{comp.code}</span>
+                        {/* Poids */}
+                        <span className="px-1 rounded text-[10px] font-bold" style={{ background: `${couleur}20`, color: couleur }}>
+                          {coef}pts
+                        </span>
+                        <span className="text-stone-400">:</span>
+                        {/* Note sur 20 avec dégradé */}
+                        {sur20 !== null ? (
+                          <span className="tabular-nums font-bold" style={{ color: noteText }}>
+                            {sur20.toFixed(2)}<span style={{ opacity: 0.7 }}>/20</span>
                           </span>
-                          <span className="text-stone-400 font-normal">/20</span>
-                        </>
-                      ) : (
-                        <span className="text-stone-300">—</span>
-                      )}
-                    </span>
-                  </div>
-                );
+                        ) : (
+                          <span className="text-stone-300">—</span>
+                        )}
+                      </div>
+                    );
               })}
             </div>
           ) : (

@@ -270,7 +270,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   };
 
   // Étape 2 : confirmer et exécuter l'enregistrement réel
-  const handleConfirmerEnregistrement = async () => {
+  const handleConfirmerEnregistrement = useCallback(async () => {
     if (!eleveSelectionneInfo || !fichierGrille || !confirmData) return;
     setShowConfirmation(false);
     setIsSaving(true);
@@ -306,7 +306,30 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       setIsSaving(false);
       setConfirmData(null);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eleveSelectionneInfo, fichierGrille, confirmData, noteSur20, commentaire, fichierNom, driveState.connected, driveState.accessToken]);
+
+  // ===== RACCOURCIS CLAVIER MODALE DE CONFIRMATION =====
+  // Entrée = confirmer (sauf dans le textarea), Échap = annuler
+  useEffect(() => {
+    if (!showConfirmation) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!isSaving) handleConfirmerEnregistrement();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowConfirmation(false);
+        setConfirmData(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirmation, isSaving, handleConfirmerEnregistrement]);
 
   // Synchroniser avec Google Drive
   const syncWithDrive = async (blob: Blob) => {
@@ -1233,18 +1256,23 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             <div className="px-6 py-4 border-t flex gap-3" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
               <button
                 onClick={() => setShowConfirmation(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                className="flex-1 flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
                 style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
               >
-                Annuler
+                <span>Annuler</span>
+                <kbd className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: "#E7E5E4", color: "#78716C" }}>Échap</kbd>
               </button>
               <button
                 onClick={handleConfirmerEnregistrement}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
+                disabled={isSaving}
+                className="flex-1 flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm disabled:opacity-60"
                 style={{ background: "#2563EB", color: "white" }}
               >
-                <Check size={15} />
-                {driveState.connected ? "Confirmer & Sync Drive" : "Confirmer & Télécharger"}
+                <div className="flex items-center gap-2">
+                  <Check size={15} />
+                  {driveState.connected ? "Confirmer & Sync Drive" : "Confirmer & Télécharger"}
+                </div>
+                <kbd className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(255,255,255,0.2)", color: "white" }}>↵ Entrée</kbd>
               </button>
             </div>
           </div>

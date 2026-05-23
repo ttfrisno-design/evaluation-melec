@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { noteGradientColor } from "@/lib/noteColor";
 import { exporterBulletinPDF } from "@/lib/pdfBulletin";
+import { calculerNotesEpreuves, calculerMoyenneBac, EPREUVES_BAC, type ResultatEpreuve } from "@/lib/epreuvesBac";
 
 interface Props {
   fichierGrille: FichierGrille | null;
@@ -224,6 +225,33 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
       ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
       : null;
   }, [elevesFiltres]);
+
+  // Notes E2, E31, E32 par élève (calculées depuis les notes de compétences)
+  const epreuvesParEleve = useMemo(() => {
+    const result: Record<string, ResultatEpreuve[]> = {};
+    for (const eleve of elevesFiltres) {
+      const key = `${eleve.nom}|${eleve.prenom}`;
+      result[key] = calculerNotesEpreuves(eleve.notesParComp);
+    }
+    return result;
+  }, [elevesFiltres]);
+
+  // Moyennes de classe pour E2, E31, E32
+  const moyennesEpreuves = useMemo(() => {
+    const result: Record<string, number | null> = {};
+    for (const ep of EPREUVES_BAC) {
+      const vals = elevesFiltres
+        .map((e) => {
+          const key = `${e.nom}|${e.prenom}`;
+          return epreuvesParEleve[key]?.find((r) => r.id === ep.id)?.note ?? null;
+        })
+        .filter((v): v is number => v !== null);
+      result[ep.id] = vals.length > 0
+        ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
+        : null;
+    }
+    return result;
+  }, [elevesFiltres, epreuvesParEleve]);
 
   const stats = useMemo(() => {
     const notes = elevesFiltres.map((e) => e.noteGlobale).filter((v): v is number => v !== null);
@@ -543,6 +571,143 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
               {stats?.en_dessous_10 ?? 0}
             </p>
             <p className="text-xs text-stone-400 mt-1">en difficulté</p>
+          </div>
+        </div>
+
+        {/* ── Notes d'épreuves du Bac E2 / E31 / E32 ── */}
+        <div className="rounded-xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid #E7E5E4" }}>
+          <div className="px-5 py-3 border-b" style={{ borderColor: "#F5F5F4", background: "#FAFAF9" }}>
+            <h2 className="text-sm font-bold" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+              Notes d'épreuves du Bac Pro MELEC
+            </h2>
+            <p className="text-xs text-stone-400 mt-0.5">
+              Calculées automatiquement à partir des compétences évaluées — se mettent à jour en temps réel
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "#F8FAFC", borderBottom: "2px solid #E7E5E4" }}>
+                  <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide sticky left-0 z-10" style={{ color: "#57534E", background: "#F8FAFC", minWidth: "160px" }}>Élève</th>
+                  {EPREUVES_BAC.map((ep) => (
+                    <th key={ep.id} className="text-center px-4 py-3" style={{ minWidth: "120px" }}>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-sm font-black" style={{ color: ep.couleur }}>{ep.id}</span>
+                        <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">coef {ep.coefBac}</span>
+                      </div>
+                    </th>
+                  ))}
+                  <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wide" style={{ color: "#1C1917", minWidth: "100px", borderLeft: "2px solid #E7E5E4" }}>Moy. Bac</th>
+                </tr>
+              </thead>
+              <tbody>
+                {elevesTriés.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-8 text-stone-400 text-sm">Aucune évaluation disponible.</td></tr>
+                ) : (
+                  elevesTriés.map((eleve, idx) => {
+                    const key = `${eleve.nom}|${eleve.prenom}`;
+                    const epreuves = epreuvesParEleve[key] || [];
+                    const moyBac = calculerMoyenneBac(epreuves);
+                    const { bg: bgBac, text: textBac } = noteGradientColor(moyBac);
+
+                    return (
+                      <tr key={key} style={{ background: idx % 2 === 0 ? "white" : "#FAFAF9", borderBottom: "1px solid #F5F5F4" }}>
+                        <td className="px-4 py-2.5 sticky left-0 z-10" style={{ background: idx % 2 === 0 ? "white" : "#FAFAF9" }}>
+                          <span className="font-semibold text-stone-800">{eleve.nom}</span>{" "}
+                          <span className="text-stone-600">{eleve.prenom}</span>
+                        </td>
+                        {epreuves.map((ep) => {
+                          const { bg, text } = noteGradientColor(ep.note);
+                          return (
+                            <td key={ep.id} className="px-4 py-2.5 text-center">
+                              {ep.note !== null ? (
+                                <div className="inline-flex flex-col items-center">
+                                  <span
+                                    className="px-2.5 py-1 rounded-lg text-sm font-black tabular-nums"
+                                    style={{ background: bg, color: text, fontFamily: "'Outfit', sans-serif" }}
+                                    title={`${ep.nbCompDisponibles}/${ep.nbCompTotal} compétences évaluées`}
+                                  >
+                                    {ep.note.toFixed(2)}
+                                  </span>
+                                  <span className="text-[10px] text-stone-400 mt-0.5">
+                                    {ep.nbCompDisponibles}/{ep.nbCompTotal} comp.
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-stone-200 text-xs">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-2.5 text-center" style={{ borderLeft: "2px solid #F5F5F4" }}>
+                          {moyBac !== null ? (
+                            <span
+                              className="px-2.5 py-1 rounded-lg text-sm font-black tabular-nums"
+                              style={{ background: bgBac, color: textBac, fontFamily: "'Outfit', sans-serif" }}
+                            >
+                              {moyBac.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-stone-200 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {/* Ligne des moyennes de classe */}
+              {Object.values(moyennesEpreuves).some((v) => v !== null) && (
+                <tfoot>
+                  <tr style={{ background: "#F8FAFC", borderTop: "2px solid #E7E5E4" }}>
+                    <td className="px-4 py-2.5 sticky left-0 z-10 font-bold text-sm" style={{ background: "#F8FAFC", color: "#1C1917" }}>Moyenne classe</td>
+                    {EPREUVES_BAC.map((ep) => {
+                      const moy = moyennesEpreuves[ep.id];
+                      const { bg, text } = noteGradientColor(moy);
+                      return (
+                        <td key={ep.id} className="px-4 py-2.5 text-center">
+                          {moy !== null ? (
+                            <span className="px-2.5 py-1 rounded-lg text-sm font-black tabular-nums" style={{ background: bg, color: text, fontFamily: "'Outfit', sans-serif" }}>
+                              {moy.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-stone-300 text-xs">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-2.5 text-center" style={{ borderLeft: "2px solid #E7E5E4" }}>
+                      {(() => {
+                        const moyBacClasse = calculerMoyenneBac(
+                          EPREUVES_BAC.map((ep) => ({ ...ep, note: moyennesEpreuves[ep.id] ?? null, nbCompDisponibles: 0, nbCompTotal: 0, poidsDisponibles: 0, poidsTotal: 0, detailComps: [] }))
+                        );
+                        const { bg, text } = noteGradientColor(moyBacClasse);
+                        return moyBacClasse !== null ? (
+                          <span className="px-2.5 py-1 rounded-lg text-sm font-black tabular-nums" style={{ background: bg, color: text, fontFamily: "'Outfit', sans-serif" }}>
+                            {moyBacClasse.toFixed(2)}
+                          </span>
+                        ) : <span className="text-stone-300 text-xs">—</span>;
+                      })()}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+          {/* Légende des épreuves */}
+          <div className="px-5 py-3 border-t" style={{ borderColor: "#F5F5F4", background: "#FAFAF9" }}>
+            <div className="flex flex-wrap gap-4 text-xs text-stone-500">
+              {EPREUVES_BAC.map((ep) => (
+                <div key={ep.id} className="flex items-center gap-1.5">
+                  <span className="font-bold" style={{ color: ep.couleur }}>{ep.id}</span>
+                  <span>({ep.libelle})</span>
+                  <span className="px-1.5 py-0.5 rounded font-semibold" style={{ background: `${ep.couleur}15`, color: ep.couleur }}>coef {ep.coefBac}</span>
+                  <span className="text-stone-400">— {ep.competences.map((c) => `${c.code}/${c.poids}`).join(" + ")}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

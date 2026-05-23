@@ -76,6 +76,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     setDate,
     toggleCompetence,
     setNote,
+    resetNotes,
     resetAll,
     noteSur20,
     totalObtenu,
@@ -94,7 +95,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     setFichierGrilleLocal(grille);
     onFichierGrilleChange?.(grille);
   };
-  const [fichierNom, setFichierNom] = useState<string>("grilleévaluationApplication.xlsx");
+  const [fichierNom, setFichierNom] = useState<string>("grille_melec_structuree.xlsx");
   const [classeSelectionnee, setClasseSelectionnee] = useState<string>("");
   const [eleveSelectionneInfo, setEleveSelectionneInfo] = useState<EleveInfo | null>(null);
 
@@ -218,8 +219,10 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     }
   };
 
-  // Sélectionner un élève
+  // Sélectionner un élève — remet à zéro les notes et les compétences sélectionnées
   const handleEleveChange = (eleve: EleveInfo) => {
+    // Réinitialiser les notes et compétences avant de charger le nouvel élève
+    resetNotes();
     setEleveSelectionneInfo(eleve);
     setEleveSelectionne({ nom: eleve.nom, prenom: eleve.prenom, classe: eleve.classe });
     setIsEleveDropdownOpen(false);
@@ -228,6 +231,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       const histo = lireEvaluationsEleve(fichierGrille.rawWorkbook, eleve.nom, eleve.prenom);
       setHistoEleve(histo);
     }
+    toast.success(`Élève sélectionné : ${eleve.nom} ${eleve.prenom} — notes remises à zéro.`);
   };
 
   // Enregistrer les notes dans le fichier Excel

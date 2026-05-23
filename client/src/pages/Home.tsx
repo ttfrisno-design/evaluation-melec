@@ -114,6 +114,11 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showInfo, setShowInfo] = useState(false);
   const [showHistoEleve, setShowHistoEleve] = useState(false);
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  // Données pré-calculées pour la modale de confirmation
+  const [confirmData, setConfirmData] = useState<{
+    notesParComp: Record<string, number | null>;
+  } | null>(null);
 
   const fileInputGrilleRef = useRef<HTMLInputElement>(null);
   const [autoLoadStatus, setAutoLoadStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -234,8 +239,8 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     toast.success(`Élève sélectionné : ${eleve.nom} ${eleve.prenom} — notes remises à zéro.`);
   };
 
-  // Enregistrer les notes dans le fichier Excel
-  const handleEnregistrer = async () => {
+  // Étape 1 : vérifier et préparer les données, puis afficher la modale de confirmation
+  const handleEnregistrer = () => {
     if (!eleveSelectionneInfo) {
       toast.error("Veuillez sélectionner un élève.");
       return;
@@ -248,47 +253,47 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       toast.error("Veuillez d'abord charger le fichier de grille Excel.");
       return;
     }
+    // Pré-calculer les notes pour la modale
+    const notesParComp: Record<string, number | null> = {};
+    for (const n of notesParCompetence) {
+      notesParComp[n.comp.code] = n.sur20;
+    }
+    setConfirmData({ notesParComp });
+    setShowConfirmation(true);
+  };
 
+  // Étape 2 : confirmer et exécuter l'enregistrement réel
+  const handleConfirmerEnregistrement = async () => {
+    if (!eleveSelectionneInfo || !fichierGrille || !confirmData) return;
+    setShowConfirmation(false);
     setIsSaving(true);
     try {
-      // Notes par compétence sur 20 (déjà calculées par useEvaluation)
-      const notesParComp: Record<string, number | null> = {};
-      for (const n of notesParCompetence) {
-        notesParComp[n.comp.code] = n.sur20;
-      }
-
-      // Enregistrer dans la nouvelle structure multi-onglets
       const wbMaj = enregistrerEvaluation(fichierGrille.rawWorkbook, {
         date: state.date,
         equipement: state.equipement,
         nom: eleveSelectionneInfo.nom,
         prenom: eleveSelectionneInfo.prenom,
         classe: eleveSelectionneInfo.classe,
-        notesParCompetence: notesParComp,
+        notesParCompetence: confirmData.notesParComp,
         noteGlobale: noteSur20,
       });
 
-      // Mettre à jour l'état local
       setFichierGrille({ ...fichierGrille, rawWorkbook: wbMaj });
-
-      // Télécharger le fichier mis à jour
       const blob = telechargerFichierGrille(wbMaj, fichierNom);
 
-      toast.success(`Notes enregistrées pour ${eleveSelectionneInfo.nom} ${eleveSelectionneInfo.prenom}. Fichier téléchargé.`);
+      toast.success(`✓ Notes enregistrées pour ${eleveSelectionneInfo.nom} ${eleveSelectionneInfo.prenom}.`);
 
-      // Synchroniser avec Google Drive si connecté
       if (driveState.connected && driveState.accessToken) {
         await syncWithDrive(blob);
       }
 
-      // Mettre à jour l'historique affiché
       const histo = lireEvaluationsEleve(wbMaj, eleveSelectionneInfo.nom, eleveSelectionneInfo.prenom);
       setHistoEleve(histo);
-
     } catch (err) {
       toast.error(String(err instanceof Error ? err.message : err));
     } finally {
       setIsSaving(false);
+      setConfirmData(null);
     }
   };
 
@@ -982,6 +987,158 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 <li>Ajoutez l'URL de l'application dans les origines autorisées</li>
                 <li>Copiez le Client ID et collez-le dans « Connecter Google Drive »</li>
               </ol>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ===== MODALE DE CONFIRMATION ===== */}
+      {showConfirmation && eleveSelectionneInfo && confirmData && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={() => setShowConfirmation(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+            style={{ background: "white" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* En-tête */}
+            <div className="px-6 py-4 border-b" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#2563EB" }}>
+                    <Download size={16} color="white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold" style={{ fontFamily: "'Outfit', sans-serif", color: "#1C1917" }}>
+                      Confirmer l'enregistrement
+                    </h2>
+                    <p className="text-xs text-stone-500">Vérifiez les informations avant de valider</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg"
+                  style={{ background: "#DBEAFE", color: "#2563EB" }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Corps */}
+            <div className="px-6 py-5 space-y-4">
+
+              {/* Informations élève */}
+              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                  style={{ background: "#2563EB" }}>
+                  {eleveSelectionneInfo.nom[0]}{eleveSelectionneInfo.prenom[0]}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-stone-800">{eleveSelectionneInfo.nom} {eleveSelectionneInfo.prenom}</p>
+                  <p className="text-xs text-stone-500">Classe {eleveSelectionneInfo.classe}</p>
+                </div>
+              </div>
+
+              {/* Date et équipement */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                  <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Calendar size={11} /> Date
+                  </p>
+                  <p className="text-sm font-semibold text-stone-800">{state.date}</p>
+                </div>
+                <div className="p-3 rounded-xl" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                  <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Wrench size={11} /> Équipement
+                  </p>
+                  <p className="text-sm font-semibold text-stone-800 truncate">{state.equipement || <span className="italic text-stone-400">Non renseigné</span>}</p>
+                </div>
+              </div>
+
+              {/* Notes par compétence */}
+              <div>
+                <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Notes par compétence</p>
+                <div className="flex flex-wrap gap-2">
+                  {COMPETENCES.filter((c) => confirmData.notesParComp[c.code] !== null && confirmData.notesParComp[c.code] !== undefined)
+                    .map((comp) => {
+                      const note = confirmData.notesParComp[comp.code]!;
+                      const couleur = note >= 16 ? "#16a34a" : note >= 10 ? "#2563EB" : "#dc2626";
+                      return (
+                        <div key={comp.code}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: `${comp.couleur}10`, border: `1px solid ${comp.couleur}30` }}
+                        >
+                          <span style={{ color: comp.couleur }}>{comp.code}</span>
+                          <span className="text-stone-400">:</span>
+                          <span className="tabular-nums font-bold" style={{ color: couleur }}>
+                            {note.toFixed(2)}/20
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Note globale */}
+              <div className="flex items-center justify-between p-4 rounded-xl"
+                style={{
+                  background: noteSur20 !== null && noteSur20 >= 10 ? "#EFF6FF" : "#FEF2F2",
+                  border: `2px solid ${noteSur20 !== null && noteSur20 >= 10 ? "#2563EB" : "#dc2626"}`,
+                }}>
+                <div>
+                  <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Note globale finale</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Moyenne pondérée sur {state.competencesSelectionnees.length} compétence(s)</p>
+                </div>
+                <div className="text-right">
+                  <span
+                    className="text-4xl font-black tabular-nums"
+                    style={{
+                      fontFamily: "'Outfit', sans-serif",
+                      color: noteSur20 !== null && noteSur20 >= 10 ? "#2563EB" : "#dc2626",
+                    }}
+                  >
+                    {noteSur20 !== null ? noteSur20.toFixed(2) : "—"}
+                  </span>
+                  <span className="text-sm font-semibold text-stone-400 ml-1">/20</span>
+                </div>
+              </div>
+
+              {/* Destination */}
+              <div className="flex items-center gap-2 text-xs text-stone-500">
+                {driveState.connected ? (
+                  <>
+                    <Cloud size={13} color="#16a34a" />
+                    <span>Sera enregistré dans <strong>{fichierNom}</strong> et synchronisé sur Google Drive ({driveState.email})</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={13} color="#57534E" />
+                    <span>Sera enregistré dans <strong>{fichierNom}</strong> et téléchargé localement</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t flex gap-3" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmerEnregistrement}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
+                style={{ background: "#2563EB", color: "white" }}
+              >
+                <Check size={15} />
+                {driveState.connected ? "Confirmer & Sync Drive" : "Confirmer & Télécharger"}
+              </button>
             </div>
           </div>
         </div>

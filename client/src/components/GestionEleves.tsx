@@ -1,17 +1,16 @@
 /**
  * Composant GestionEleves — Modal de gestion des élèves
- * Permet d'ajouter/supprimer des élèves et des classes
+ * Permet d'ajouter/supprimer des élèves, des classes, et d'importer en masse via CSV
  * Design: Dashboard Technique Compact
  */
-import { useState } from "react";
-import { X, Plus, Trash2, UserPlus, Users, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, Plus, Trash2, UserPlus, Users, ChevronDown, ChevronRight, AlertTriangle, Upload, FileText } from "lucide-react";
 import type { FichierGrille } from "@/lib/excelUtils";
 import {
   ajouterEleve,
   supprimerEleve,
   ajouterClasse,
   supprimerClasse,
-  lireFichierGrille,
 } from "@/lib/excelUtils";
 import * as XLSX from "xlsx";
 
@@ -30,6 +29,13 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
   // Formulaire ajout classe
   const [nomNouvelleClasse, setNomNouvelleClasse] = useState("");
   const [showAjoutClasse, setShowAjoutClasse] = useState(false);
+
+  // Import CSV
+  const [showImportCSV, setShowImportCSV] = useState(false);
+  const [classeImport, setClasseImport] = useState(fichierGrille.classes[0]?.nom || "");
+  const [csvPreview, setCsvPreview] = useState<Array<{ nom: string; prenom: string; valide: boolean; erreur?: string }>>([]);
+  const [csvTexte, setCsvTexte] = useState("");
+  const fileInputCsvRef = useRef<HTMLInputElement>(null);
 
   // UI
   const [classeOuverte, setClasseOuverte] = useState<string>(fichierGrille.classes[0]?.nom || "");
@@ -130,6 +136,116 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
     showMsg(msg, "success");
   };
 
+  /** Parse le texte CSV/coller et génère un aperçu */
+  const parserCSV = (texte: string) => {
+    const lignes = texte.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const eleves: Array<{ nom: string; prenom: string; valide: boolean; erreur?: string }> = [];
+
+    for (const ligne of lignes) {
+      // Ignorer les lignes d'en-tête
+      if (/^nom|^prénom|^name|^firstname/i.test(ligne)) continue;
+
+      // Séparateurs : virgule, point-virgule, tabulation
+      const parts = ligne.split(/[,;\t]/).map((p) => p.trim().replace(/^"|"$/g, ""));
+
+      let nom = "";
+      let prenom = "";
+
+      if (parts.length >= 2) {
+        nom = parts[0].toUpperCase();
+        prenom = parts[1];
+      } else if (parts.length === 1 && parts[0].includes(" ")) {
+        // Format "NOM Prénom" en une seule colonne
+        const mots = parts[0].split(" ");
+        nom = mots[0].toUpperCase();
+        prenom = mots.slice(1).join(" ");
+      } else {
+        nom = parts[0].toUpperCase();
+      }
+
+      if (!nom) continue;
+
+      // Vérifier si déjà présent dans la classe
+      const existe = fichierGrille.classes
+        .find((c) => c.nom === classeImport)
+        ?.eleves.some((e) => e.nom === nom && e.prenom.toLowerCase() === prenom.toLowerCase());
+
+      eleves.push({
+        nom,
+        prenom,
+        valide: !existe,
+        erreur: existe ? "Déjà dans la classe" : undefined,
+      });
+    }
+
+    setCsvPreview(eleves);
+  };
+
+  const handleCsvTexteChange = (texte: string) => {
+    setCsvTexte(texte);
+    parserCSV(texte);
+  };
+
+  /** Lecture d'un fichier CSV/Excel uploadé */
+  const handleFichierCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      // Détecter si c'est un fichier Excel
+      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+        try {
+          const wb = XLSX.read(new Uint8Array(ev.target?.result as ArrayBuffer), { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" }) as string[][];
+          const csv = rows.map((r) => r.slice(0, 2).join(";")).join("\n");
+          setCsvTexte(csv);
+          parserCSV(csv);
+        } catch {
+          showMsg("Impossible de lire le fichier Excel.", "error");
+        }
+      } else {
+        setCsvTexte(text);
+        parserCSV(text);
+      }
+    };
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file, "UTF-8");
+    }
+    e.target.value = "";
+  };
+
+  /** Importer tous les élèves valides dans la classe */
+  const handleImporterCSV = () => {
+    const valides = csvPreview.filter((e) => e.valide);
+    if (valides.length === 0) {
+      showMsg("Aucun élève valide à importer.", "error");
+      return;
+    }
+
+    let wb = fichierGrille.rawWorkbook;
+    let nbAjoutes = 0;
+
+    for (const eleve of valides) {
+      const result = ajouterEleve(wb, eleve.nom, eleve.prenom, classeImport);
+      if (result.succes) {
+        wb = result.wb;
+        nbAjoutes++;
+      }
+    }
+
+    appliquerChangement(wb);
+    showMsg(`${nbAjoutes} élève(s) importé(s) dans la classe ${classeImport}.`, "success");
+    setCsvPreview([]);
+    setCsvTexte("");
+    setShowImportCSV(false);
+    setClasseOuverte(classeImport);
+  };
+
   const totalEleves = fichierGrille.classes.reduce((s, c) => s + c.eleves.length, 0);
 
   return (
@@ -225,6 +341,124 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
                 <Plus size={14} /> Ajouter
               </button>
             </div>
+          </div>
+
+          {/* ── Section import CSV ── */}
+          <div className="px-6 py-4 border-b" style={{ borderColor: "#F5F5F4" }}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
+                <Upload size={12} /> Import en masse (CSV / Excel)
+              </h3>
+              <button
+                onClick={() => { setShowImportCSV(!showImportCSV); setCsvPreview([]); setCsvTexte(""); }}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-all"
+                style={{ background: showImportCSV ? "#EFF6FF" : "#F5F5F4", color: showImportCSV ? "#2563EB" : "#57534E" }}
+              >
+                {showImportCSV ? "Fermer" : "Ouvrir"}
+              </button>
+            </div>
+
+            {showImportCSV && (
+              <div className="space-y-3">
+                {/* Sélecteur de classe cible */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-stone-500 font-semibold">Classe cible :</span>
+                  <select
+                    value={classeImport}
+                    onChange={(e) => { setClasseImport(e.target.value); if (csvTexte) parserCSV(csvTexte); }}
+                    className="px-3 py-1.5 rounded-lg text-sm outline-none"
+                    style={{ background: "white", border: "1.5px solid #E7E5E4", color: "#1C1917" }}
+                  >
+                    {fichierGrille.classes.map((c) => (
+                      <option key={c.nom} value={c.nom}>{c.nom}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Zone de saisie / glisser-déposer */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fileInputCsvRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                      style={{ background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE" }}
+                    >
+                      <FileText size={12} /> Charger un fichier CSV / Excel
+                    </button>
+                    <span className="text-xs text-stone-400">ou coller directement ci-dessous</span>
+                  </div>
+                  <input
+                    ref={fileInputCsvRef}
+                    type="file"
+                    accept=".csv,.txt,.xlsx,.xls"
+                    className="hidden"
+                    onChange={handleFichierCSV}
+                  />
+                  <textarea
+                    value={csvTexte}
+                    onChange={(e) => handleCsvTexteChange(e.target.value)}
+                    placeholder={`Coller votre liste ici :\nNOM;Prénom\nDUPONT;Jean\nMARTIN;Alice\n\nFormats acceptés : CSV (virgule, point-virgule, tabulation), ou \"NOM Prénom\" par ligne`}
+                    rows={5}
+                    className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none font-mono"
+                    style={{ background: "#FAFAF9", border: "1.5px solid #E7E5E4", color: "#1C1917", lineHeight: "1.6" }}
+                    onFocus={(e) => (e.target.style.borderColor = "#2563EB")}
+                    onBlur={(e) => (e.target.style.borderColor = "#E7E5E4")}
+                  />
+                </div>
+
+                {/* Aperçu des élèves détectés */}
+                {csvPreview.length > 0 && (
+                  <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #E7E5E4" }}>
+                    <div className="flex items-center justify-between px-3 py-2" style={{ background: "#F8FAFC", borderBottom: "1px solid #E7E5E4" }}>
+                      <span className="text-xs font-semibold text-stone-500">
+                        {csvPreview.filter((e) => e.valide).length} élève(s) à importer
+                        {csvPreview.filter((e) => !e.valide).length > 0 && (
+                          <span className="ml-2 text-orange-500">
+                            · {csvPreview.filter((e) => !e.valide).length} ignoré(s)
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-stone-400">Aperçu</span>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto">
+                      {csvPreview.map((eleve, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between px-3 py-1.5 text-sm"
+                          style={{
+                            background: eleve.valide ? (i % 2 === 0 ? "white" : "#FAFAF9") : "#FEF9EC",
+                            borderBottom: "1px solid #F5F5F4",
+                            opacity: eleve.valide ? 1 : 0.6,
+                          }}
+                        >
+                          <span>
+                            <span className="font-semibold text-stone-800">{eleve.nom}</span>{" "}
+                            <span className="text-stone-600">{eleve.prenom}</span>
+                          </span>
+                          {eleve.valide ? (
+                            <span className="text-xs text-green-600 font-semibold">✓ À importer</span>
+                          ) : (
+                            <span className="text-xs text-orange-500">⚠ {eleve.erreur}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bouton importer */}
+                {csvPreview.filter((e) => e.valide).length > 0 && (
+                  <button
+                    onClick={handleImporterCSV}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+                    style={{ background: "#2563EB", color: "white" }}
+                  >
+                    <Upload size={14} />
+                    Importer {csvPreview.filter((e) => e.valide).length} élève(s) dans {classeImport}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Liste des classes et élèves ── */}

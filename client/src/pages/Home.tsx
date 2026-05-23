@@ -51,6 +51,7 @@ import {
   History,
   Users,
   RefreshCw,
+  BarChart2,
 } from "lucide-react";
 import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
@@ -60,7 +61,13 @@ const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
 // Client ID Google OAuth2 pré-configuré pour RMQUENEAU@gmail.com
 const GOOGLE_CLIENT_ID_DEFAULT = "481482019199-v7c87meflc0ns2b7985nq37c96t66djf.apps.googleusercontent.com";
 
-export default function Home() {
+interface HomeProps {
+  onShowDashboard?: () => void;
+  onFichierGrilleChange?: (grille: FichierGrille | null) => void;
+  fichierGrilleExternal?: FichierGrille | null;
+}
+
+export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGrilleExternal }: HomeProps = {}) {
   const {
     state,
     setEleves,
@@ -78,8 +85,15 @@ export default function Home() {
     notesParCompetence,
   } = useEvaluation();
 
-  // Fichier grille
-  const [fichierGrille, setFichierGrille] = useState<FichierGrille | null>(null);
+  // Fichier grille — synchronisé avec l'état externe (App.tsx)
+  const [fichierGrille, setFichierGrilleLocal] = useState<FichierGrille | null>(
+    fichierGrilleExternal ?? null
+  );
+
+  const setFichierGrille = (grille: FichierGrille | null) => {
+    setFichierGrilleLocal(grille);
+    onFichierGrilleChange?.(grille);
+  };
   const [fichierNom, setFichierNom] = useState<string>("grilleévaluationApplication.xlsx");
   const [classeSelectionnee, setClasseSelectionnee] = useState<string>("");
   const [eleveSelectionneInfo, setEleveSelectionneInfo] = useState<EleveInfo | null>(null);
@@ -663,6 +677,18 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Bouton tableau de bord */}
+            {fichierGrille && onShowDashboard && (
+              <button
+                onClick={onShowDashboard}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#292524", border: "1px solid #E7E5E4" }}
+                title="Tableau de bord de la classe"
+              >
+                <BarChart2 size={14} />
+                Tableau de bord
+              </button>
+            )}
             <button onClick={() => setShowInfo(true)}
               className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
               style={{ background: "#F5F5F4", color: "#78716C" }}

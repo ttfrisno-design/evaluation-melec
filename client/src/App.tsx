@@ -5,31 +5,49 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import { useState } from "react";
+import type { FichierGrille } from "@/lib/excelUtils";
 
+// Contexte partagé entre Home et Dashboard pour le fichier grille
+function AppContent() {
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [fichierGrille, setFichierGrille] = useState<FichierGrille | null>(null);
+
+  if (showDashboard) {
+    return (
+      <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <Dashboard
+          fichierGrille={fichierGrille}
+          onRetour={() => setShowDashboard(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <Home
+      onShowDashboard={() => setShowDashboard(true)}
+      onFichierGrilleChange={setFichierGrille}
+      fichierGrilleExternal={fichierGrille}
+    />
+  );
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={AppContent} />
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />

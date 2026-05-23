@@ -1087,9 +1087,44 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
 
               {/* Commentaire optionnel */}
               <div>
-                <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wide mb-1.5">
+                <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">
                   Commentaire <span className="normal-case font-normal text-stone-300">(optionnel)</span>
                 </label>
+
+                {/* Boutons de commentaires rapides */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    { label: "✓ Travail soigné",     couleur: "#16a34a" },
+                    { label: "✓ Progrès notable",    couleur: "#2563EB" },
+                    { label: "✓ Bon comportement",   couleur: "#7C3AED" },
+                    { label: "⚠ À revoir",            couleur: "#d97706" },
+                    { label: "⚠ Manque de rigueur",  couleur: "#d97706" },
+                    { label: "✗ Non validé",          couleur: "#dc2626" },
+                    { label: "✗ Absent",              couleur: "#dc2626" },
+                    { label: "→ Encouragements",     couleur: "#0891B2" },
+                  ].map(({ label, couleur }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() =>
+                        setCommentaire((prev) =>
+                          prev.trim()
+                            ? prev.trim() + " — " + label
+                            : label
+                        )
+                      }
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all hover:opacity-80 active:scale-95"
+                      style={{
+                        background: `${couleur}12`,
+                        color: couleur,
+                        border: `1px solid ${couleur}30`,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
                 <textarea
                   value={commentaire}
                   onChange={(e) => setCommentaire(e.target.value)}

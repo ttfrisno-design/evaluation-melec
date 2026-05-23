@@ -15,11 +15,13 @@ import { useEvaluation } from "@/hooks/useEvaluation";
 import { COMPETENCES } from "@/lib/competences";
 import {
   lireFichierGrille,
-  ecrireNotesEleve,
+  enregistrerEvaluation,
   telechargerFichierGrille,
-  lireNotesEleve,
+  lireEvaluationsEleve,
+  creerWorkbookVide,
   type FichierGrille,
   type EleveInfo,
+  type BlocEvaluation,
 } from "@/lib/excelUtils";
 import {
   loadDriveState,
@@ -96,7 +98,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showHistoEleve, setShowHistoEleve] = useState(false);
-  const [histoEleve, setHistoEleve] = useState<ReturnType<typeof lireNotesEleve>>([]);
+  const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
 
   const fileInputGrilleRef = useRef<HTMLInputElement>(null);
   const [autoLoadStatus, setAutoLoadStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -207,9 +209,9 @@ export default function Home() {
     setEleveSelectionneInfo(eleve);
     setEleveSelectionne({ nom: eleve.nom, prenom: eleve.prenom, classe: eleve.classe });
     setIsEleveDropdownOpen(false);
-    // Charger l'historique de l'élève
+    // Charger l'historique de l'élève depuis son onglet dédié
     if (fichierGrille) {
-      const histo = lireNotesEleve(fichierGrille.rawWorkbook, eleve);
+      const histo = lireEvaluationsEleve(fichierGrille.rawWorkbook, eleve.nom, eleve.prenom);
       setHistoEleve(histo);
     }
   };
@@ -237,15 +239,16 @@ export default function Home() {
         notesParComp[n.comp.code] = n.sur20;
       }
 
-      // Mettre à jour le workbook avec notes /20 + note globale /20
-      const wbMaj = ecrireNotesEleve(
-        fichierGrille.rawWorkbook,
-        eleveSelectionneInfo,
-        notesParComp,
-        state.equipement,
-        state.date,
-        noteSur20  // note globale pondérée /20
-      );
+      // Enregistrer dans la nouvelle structure multi-onglets
+      const wbMaj = enregistrerEvaluation(fichierGrille.rawWorkbook, {
+        date: state.date,
+        equipement: state.equipement,
+        nom: eleveSelectionneInfo.nom,
+        prenom: eleveSelectionneInfo.prenom,
+        classe: eleveSelectionneInfo.classe,
+        notesParCompetence: notesParComp,
+        noteGlobale: noteSur20,
+      });
 
       // Mettre à jour l'état local
       setFichierGrille({ ...fichierGrille, rawWorkbook: wbMaj });
@@ -261,7 +264,7 @@ export default function Home() {
       }
 
       // Mettre à jour l'historique affiché
-      const histo = lireNotesEleve(wbMaj, eleveSelectionneInfo);
+      const histo = lireEvaluationsEleve(wbMaj, eleveSelectionneInfo.nom, eleveSelectionneInfo.prenom);
       setHistoEleve(histo);
 
     } catch (err) {
@@ -873,29 +876,40 @@ export default function Home() {
               </button>
             </div>
             <div className="overflow-y-auto p-6 space-y-4" style={{ maxHeight: "calc(80vh - 80px)" }}>
-              {histoEleve.map((entry) => (
-                <div key={entry.bloc} className="rounded-xl p-4" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-semibold text-sm" style={{ color: "#1C1917" }}>Évaluation n°{entry.bloc}</span>
-                    {entry.meta && <span className="text-xs text-stone-400">{entry.meta}</span>}
+              {histoEleve.length === 0 ? (
+                <p className="text-sm text-stone-400 text-center py-8">Aucune évaluation enregistrée pour cet élève.</p>
+              ) : (
+                histoEleve.map((entry: BlocEvaluation, idx: number) => (
+                  <div key={idx} className="rounded-xl p-4" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold text-sm" style={{ color: "#1C1917" }}>Évaluation n°{idx + 1} — {entry.date}</span>
+                      <div className="flex items-center gap-3">
+                        {entry.equipement && <span className="text-xs text-stone-400">{entry.equipement}</span>}
+                        {entry.noteGlobale !== null && (
+                          <span className="text-sm font-bold tabular-nums" style={{ color: entry.noteGlobale >= 10 ? "#2563EB" : "#dc2626" }}>
+                            {entry.noteGlobale.toFixed(2)}/20
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(entry.notes).map(([code, note]) => {
+                        if (note === null) return null;
+                        const comp = COMPETENCES.find((c) => c.code === code);
+                        return (
+                          <div key={code} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                            style={{ background: `${comp?.couleur || "#2563EB"}10`, border: `1px solid ${comp?.couleur || "#2563EB"}30` }}
+                          >
+                            <span style={{ color: comp?.couleur || "#2563EB" }}>{code}</span>
+                            <span className="text-stone-500">:</span>
+                            <span className="tabular-nums text-stone-800">{(note as number).toFixed(2)}/20</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(entry.notes).map(([code, note]) => {
-                      if (note === null) return null;
-                      const comp = COMPETENCES.find((c) => c.code === code);
-                      return (
-                        <div key={code} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
-                          style={{ background: `${comp?.couleur || "#2563EB"}10`, border: `1px solid ${comp?.couleur || "#2563EB"}30` }}
-                        >
-                          <span style={{ color: comp?.couleur || "#2563EB" }}>{code}</span>
-                          <span className="text-stone-500">:</span>
-                          <span className="tabular-nums text-stone-800">{note}/20</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

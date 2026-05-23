@@ -1,27 +1,41 @@
 /**
  * Utilitaires Excel — Application MELEC Éval
- * Structure du fichier grilleévaluationApplication.xlsx :
- *   - Une feuille par classe (ex: TP26, TP27)
- *   - Ligne 1 : "Nom" + noms des élèves en colonnes B, C, D...
- *   - Ligne 2 : "Prénom" + prénoms des élèves
- *   - Blocs de 13 lignes (C1 à C13) séparés par une ligne vide
- *     Bloc 1 : lignes 3-15 (évaluation 1)
- *     Bloc 2 : lignes 17-29 (évaluation 2)
- *     Bloc 3 : lignes 31-43 (évaluation 3)
- *   - Chaque cellule [ligne compétence][colonne élève] = note sur 20
+ *
+ * Structure du fichier généré "grilleévaluationApplication.xlsx" :
+ *
+ *  ┌─────────────────────────────────────────────────────────────┐
+ *  │  Onglet "TP26"  (onglet classe)                             │
+ *  │  Colonnes : Nom | Prénom | Date | Équipement | Note /20     │
+ *  │  1 ligne par évaluation enregistrée pour cette classe       │
+ *  ├─────────────────────────────────────────────────────────────┤
+ *  │  Onglet "1P2"   (onglet classe)                             │
+ *  │  Même structure                                             │
+ *  ├─────────────────────────────────────────────────────────────┤
+ *  │  Onglet "ADAM Louis" (onglet élève)                         │
+ *  │  Ligne 1 : Date | Équipement                                │
+ *  │  Ligne 2 : C1  | note/20                                    │
+ *  │  Ligne 3 : C2  | note/20                                    │
+ *  │  ...                                                        │
+ *  │  Ligne N : Note globale /20                                 │
+ *  │  (bloc répété pour chaque nouvelle évaluation)              │
+ *  └─────────────────────────────────────────────────────────────┘
  */
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
+// ─────────────────────────────────────────────────────────────
+//  TYPES
+// ─────────────────────────────────────────────────────────────
+
 export interface EleveInfo {
   nom: string;
   prenom: string;
-  classe: string; // nom de la feuille (ex: "TP26")
-  colIndex: number; // index de colonne dans la feuille (0-based, 0 = col B)
+  classe: string; // ex: "TP26"
+  colIndex: number; // non utilisé dans la nouvelle structure mais conservé
 }
 
 export interface ClasseData {
-  nom: string; // ex: "TP26"
+  nom: string;
   eleves: EleveInfo[];
 }
 
@@ -30,10 +44,24 @@ export interface FichierGrille {
   rawWorkbook: XLSX.WorkBook;
 }
 
-// Codes des compétences dans l'ordre
-const CODES_COMPETENCES = ["C1","C2","C3","C4","C5","C6","C7","C8","C9","C10","C11","C12","C13"];
+export interface EntreeEvaluation {
+  date: string;
+  equipement: string;
+  nom: string;
+  prenom: string;
+  classe: string;
+  notesParCompetence: Record<string, number | null>; // C1 -> note /20
+  noteGlobale: number | null;
+}
 
-// Lire le fichier Excel de grille et extraire les classes + élèves
+// ─────────────────────────────────────────────────────────────
+//  LECTURE DU FICHIER EXISTANT
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Lit le fichier Excel et extrait les classes + élèves depuis les onglets.
+ * Détecte automatiquement les onglets "classe" (TP26, 1P2…) et "élève".
+ */
 export async function lireFichierGrille(file: File): Promise<FichierGrille> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -52,26 +80,42 @@ export async function lireFichierGrille(file: File): Promise<FichierGrille> {
 
           if (rows.length < 2) continue;
 
-          const nomRow = rows[0]; // Ligne 1 : Nom + noms
-          const prenomRow = rows[1]; // Ligne 2 : Prénom + prénoms
+          const header = rows[0];
+          // Détecter un onglet "classe" : première colonne = "Nom"
+          const isClasseSheet =
+            header &&
+            String(header[0] || "").toLowerCase().includes("nom") &&
+            !String(sheetName).includes(" "); // onglet élève a un espace
 
-          const eleves: EleveInfo[] = [];
-          // Colonnes à partir de l'index 1 (colonne B)
-          for (let col = 1; col < nomRow.length; col++) {
-            const nom = String(nomRow[col] || "").trim();
-            const prenom = String(prenomRow[col] || "").trim();
-            if (nom || prenom) {
-              eleves.push({
-                nom: nom.toUpperCase(),
-                prenom: prenom.charAt(0).toUpperCase() + prenom.slice(1).toLowerCase(),
-                classe: sheetName,
-                colIndex: col - 1, // 0-based depuis colonne B
-              });
+          if (isClasseSheet) {
+            // Extraire les élèves depuis les lignes de données
+            const eleves: EleveInfo[] = [];
+            const seen = new Set<string>();
+            for (let i = 1; i < rows.length; i++) {
+              const row = rows[i];
+              const nom = String(row[0] || "").trim().toUpperCase();
+              const prenom = String(row[1] || "").trim();
+              if (nom && prenom) {
+                const key = `${nom}|${prenom}`;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  eleves.push({ nom, prenom, classe: sheetName, colIndex: 0 });
+                }
+              }
+            }
+            if (eleves.length > 0) {
+              classes.push({ nom: sheetName, eleves });
             }
           }
+        }
 
-          if (eleves.length > 0) {
-            classes.push({ nom: sheetName, eleves });
+        // Si aucun onglet classe détecté, créer des classes vides par défaut
+        if (classes.length === 0) {
+          // Chercher des onglets qui ressemblent à des classes (TP, 1P, BTS…)
+          for (const sheetName of wb.SheetNames) {
+            if (/^(TP|1P|2P|BTS|CAP|BAC)/i.test(sheetName)) {
+              classes.push({ nom: sheetName, eleves: [] });
+            }
           }
         }
 
@@ -85,124 +129,191 @@ export async function lireFichierGrille(file: File): Promise<FichierGrille> {
   });
 }
 
-// Trouver le prochain bloc disponible (non rempli) pour un élève dans une feuille
-// Structure : blocs de 13 lignes (C1-C13) séparés par 1 ligne vide
-// Bloc 1 : lignes index 2-14 (rows[2] à rows[14])
-// Bloc 2 : lignes index 16-28
-// Bloc 3 : lignes index 30-42
-const BLOCS_START = [2, 16, 30]; // index 0-based dans le tableau de lignes
+// ─────────────────────────────────────────────────────────────
+//  CRÉATION / MISE À JOUR DU FICHIER EXCEL
+// ─────────────────────────────────────────────────────────────
 
-function trouverBlocDisponible(
-  ws: XLSX.WorkSheet,
-  colIndex: number // 0-based depuis colonne B → colonne réelle = colIndex + 1
-): number {
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-    header: 1,
-    defval: null,
-  }) as (string | number | null)[][];
+const CODES_COMPETENCES = [
+  "C1","C2","C3","C4","C5","C6","C7",
+  "C8","C9","C10","C11","C12","C13",
+];
 
-  const colReelle = colIndex + 1; // +1 car col 0 = "Nom"
+// Couleurs de fond pour les en-têtes (format ARGB pour XLSX)
+const COULEUR_ENTETE = "FF2563EB";   // Bleu MELEC
+const COULEUR_NOTE   = "FF1E3A5F";   // Bleu foncé
+const COULEUR_GLOBAL = "FFEF4444";   // Rouge pour note globale
 
-  for (const blocStart of BLOCS_START) {
-    // Vérifier si le bloc est vide pour cet élève
-    let blocVide = true;
-    for (let i = 0; i < 13; i++) {
-      const rowIdx = blocStart + i;
-      if (rows[rowIdx] && rows[rowIdx][colReelle] !== null && rows[rowIdx][colReelle] !== undefined && rows[rowIdx][colReelle] !== "") {
-        blocVide = false;
-        break;
-      }
-    }
-    if (blocVide) return blocStart;
-  }
-
-  // Tous les blocs sont remplis → écraser le dernier
-  return BLOCS_START[BLOCS_START.length - 1];
-}
-
-// Écrire les notes d'un élève dans le fichier Excel
-// - notesParCompetence : note /20 par compétence (C1, C2...)
-// - noteGlobale : note globale pondérée /20, écrite sous C13
-export function ecrireNotesEleve(
+/**
+ * Enregistre une évaluation dans le workbook :
+ *  1. Met à jour l'onglet classe (1 ligne : Nom | Prénom | Date | Équipement | Note/20)
+ *  2. Met à jour l'onglet élève (bloc : Date/Équipement + C1..C13 + Note globale)
+ *  3. Crée les onglets s'ils n'existent pas
+ */
+export function enregistrerEvaluation(
   wb: XLSX.WorkBook,
-  eleve: EleveInfo,
-  notesParCompetence: Record<string, number | null>, // C1 -> note /20
-  equipement: string,
-  date: string,
-  noteGlobale: number | null = null // note globale /20 à écrire sous C13
+  entree: EntreeEvaluation
 ): XLSX.WorkBook {
-  const ws = wb.Sheets[eleve.classe];
-  if (!ws) return wb;
+  const { date, equipement, nom, prenom, classe, notesParCompetence, noteGlobale } = entree;
 
-  // Lire les données existantes
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-    header: 1,
-    defval: null,
-  }) as (string | number | null)[][];
+  // ── 1. Onglet CLASSE ──────────────────────────────────────
+  wb = _mettreAJourOngletClasse(wb, classe, nom, prenom, date, equipement, noteGlobale);
 
-  // S'assurer que les lignes existent jusqu'à la ligne 43 (index 42)
-  while (rows.length < 43) {
-    rows.push(new Array(rows[0]?.length || 15).fill(null));
-  }
+  // ── 2. Onglet ÉLÈVE ───────────────────────────────────────
+  const nomOngletEleve = _nomOngletEleve(nom, prenom);
+  wb = _mettreAJourOngletEleve(wb, nomOngletEleve, nom, prenom, classe, date, equipement, notesParCompetence, noteGlobale);
 
-  const colReelle = eleve.colIndex + 1; // colonne réelle dans le tableau
-
-  // Trouver le bloc disponible
-  const blocStart = trouverBlocDisponible(ws, eleve.colIndex);
-
-  // Écrire les notes dans le bloc
-  for (let i = 0; i < CODES_COMPETENCES.length; i++) {
-    const code = CODES_COMPETENCES[i];
-    const rowIdx = blocStart + i;
-    
-    // S'assurer que la ligne existe
-    while (rows.length <= rowIdx) {
-      rows.push(new Array(rows[0]?.length || 15).fill(null));
-    }
-    
-    // S'assurer que la colonne "Cx" est bien en col 0
-    if (!rows[rowIdx][0]) {
-      rows[rowIdx][0] = code;
-    }
-
-    const note = notesParCompetence[code];
-    rows[rowIdx][colReelle] = note !== null && note !== undefined ? note : null;
-  }
-
-  // Ajouter une ligne de métadonnées (date + équipement) dans la ligne vide avant le bloc
-  const metaRowIdx = blocStart - 1;
-  if (metaRowIdx >= 0) {
-    while (rows.length <= metaRowIdx) {
-      rows.push(new Array(rows[0]?.length || 15).fill(null));
-    }
-    rows[metaRowIdx][colReelle] = `${date} | ${equipement}`;
-  }
-
-  // Écrire la note globale /20 dans la ligne juste après C13 (index blocStart + 13)
-  // Structure : ligne vide séparateur + étiquette "Note /20" en col 0
-  const noteGlobaleRowIdx = blocStart + CODES_COMPETENCES.length; // ligne après C13
-  while (rows.length <= noteGlobaleRowIdx) {
-    rows.push(new Array(rows[0]?.length || 15).fill(null));
-  }
-  // Étiquette en colonne 0 (seulement si pas déjà remplie)
-  if (!rows[noteGlobaleRowIdx][0]) {
-    rows[noteGlobaleRowIdx][0] = "Note globale /20";
-  }
-  rows[noteGlobaleRowIdx][colReelle] = noteGlobale !== null ? noteGlobale : null;
-
-  // Reconstruire la feuille
-  const newWs = XLSX.utils.aoa_to_sheet(rows);
-  
-  // Copier les propriétés de mise en forme si elles existent
-  if (ws["!cols"]) newWs["!cols"] = ws["!cols"];
-  if (ws["!rows"]) newWs["!rows"] = ws["!rows"];
-  if (ws["!merges"]) newWs["!merges"] = ws["!merges"];
-
-  wb.Sheets[eleve.classe] = newWs;
   return wb;
 }
 
-// Télécharger le fichier Excel modifié
+/**
+ * Met à jour l'onglet classe.
+ * Structure : Nom | Prénom | Date | Équipement | Note /20
+ */
+function _mettreAJourOngletClasse(
+  wb: XLSX.WorkBook,
+  classe: string,
+  nom: string,
+  prenom: string,
+  date: string,
+  equipement: string,
+  noteGlobale: number | null
+): XLSX.WorkBook {
+  let rows: (string | number | null)[][] = [];
+
+  // Charger l'onglet existant ou créer
+  if (wb.Sheets[classe]) {
+    rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[classe], {
+      header: 1,
+      defval: null,
+    }) as (string | number | null)[][];
+  }
+
+  // En-tête si absent
+  if (rows.length === 0 || String(rows[0][0] || "").toLowerCase() !== "nom") {
+    rows.unshift(["Nom", "Prénom", "Date", "Équipement", "Note /20"]);
+  }
+
+  // Ajouter la nouvelle ligne
+  rows.push([
+    nom,
+    prenom,
+    date,
+    equipement || "",
+    noteGlobale !== null ? noteGlobale : "",
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Largeurs de colonnes
+  ws["!cols"] = [
+    { wch: 18 }, // Nom
+    { wch: 16 }, // Prénom
+    { wch: 12 }, // Date
+    { wch: 28 }, // Équipement
+    { wch: 10 }, // Note /20
+  ];
+
+  wb.Sheets[classe] = ws;
+  if (!wb.SheetNames.includes(classe)) {
+    wb.SheetNames.push(classe);
+  }
+
+  return wb;
+}
+
+/**
+ * Met à jour l'onglet élève.
+ * Structure par bloc d'évaluation :
+ *   Ligne 1 : "Date"       | valeur date  | "Équipement" | valeur équipement
+ *   Ligne 2 : "C1"         | note /20
+ *   ...
+ *   Ligne 14: "C13"        | note /20
+ *   Ligne 15: "Note /20"   | noteGlobale
+ *   Ligne 16: (vide séparateur)
+ */
+function _mettreAJourOngletEleve(
+  wb: XLSX.WorkBook,
+  nomOnglet: string,
+  nom: string,
+  prenom: string,
+  classe: string,
+  date: string,
+  equipement: string,
+  notesParCompetence: Record<string, number | null>,
+  noteGlobale: number | null
+): XLSX.WorkBook {
+  let rows: (string | number | null)[][] = [];
+
+  // Charger l'onglet existant ou créer
+  if (wb.Sheets[nomOnglet]) {
+    rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[nomOnglet], {
+      header: 1,
+      defval: null,
+    }) as (string | number | null)[][];
+  }
+
+  // En-tête élève si absent
+  if (rows.length === 0) {
+    rows.push([`Élève : ${nom} ${prenom}`, "", `Classe : ${classe}`]);
+    rows.push([]); // ligne vide
+  }
+
+  // Construire le bloc de cette évaluation
+  const bloc: (string | number | null)[][] = [];
+
+  // Ligne date + équipement
+  bloc.push(["Date", date, "Équipement", equipement || ""]);
+
+  // 1 ligne par compétence évaluée
+  for (const code of CODES_COMPETENCES) {
+    const note = notesParCompetence[code];
+    if (note !== null && note !== undefined) {
+      bloc.push([code, note]);
+    }
+  }
+
+  // Ligne note globale
+  bloc.push(["Note globale /20", noteGlobale !== null ? noteGlobale : ""]);
+
+  // Ligne vide séparateur
+  bloc.push([]);
+
+  // Ajouter le bloc à la suite
+  rows.push(...bloc);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Largeurs de colonnes
+  ws["!cols"] = [
+    { wch: 20 }, // Libellé
+    { wch: 12 }, // Valeur
+    { wch: 14 }, // Libellé 2
+    { wch: 28 }, // Valeur 2
+  ];
+
+  wb.Sheets[nomOnglet] = ws;
+  if (!wb.SheetNames.includes(nomOnglet)) {
+    wb.SheetNames.push(nomOnglet);
+  }
+
+  return wb;
+}
+
+/**
+ * Génère le nom de l'onglet élève (max 31 caractères, règle Excel).
+ */
+function _nomOngletEleve(nom: string, prenom: string): string {
+  const raw = `${nom} ${prenom}`.replace(/[\\/*?[\]:]/g, "").trim();
+  return raw.slice(0, 31);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TÉLÉCHARGEMENT
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Télécharge le workbook sous forme de fichier .xlsx.
+ */
 export function telechargerFichierGrille(
   wb: XLSX.WorkBook,
   nomFichier = "grilleévaluationApplication.xlsx"
@@ -215,12 +326,44 @@ export function telechargerFichierGrille(
   return blob;
 }
 
-// Lire les notes existantes d'un élève dans le fichier
-export function lireNotesEleve(
+/**
+ * Crée un workbook vide avec les onglets de classes pré-créés.
+ */
+export function creerWorkbookVide(classes: string[]): XLSX.WorkBook {
+  const wb = XLSX.utils.book_new();
+  for (const classe of classes) {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Nom", "Prénom", "Date", "Équipement", "Note /20"],
+    ]);
+    ws["!cols"] = [
+      { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, classe);
+  }
+  return wb;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  LECTURE DES ÉVALUATIONS EXISTANTES D'UN ÉLÈVE
+// ─────────────────────────────────────────────────────────────
+
+export interface BlocEvaluation {
+  date: string;
+  equipement: string;
+  notes: Record<string, number | null>;
+  noteGlobale: number | null;
+}
+
+/**
+ * Lit l'historique des évaluations d'un élève depuis son onglet dédié.
+ */
+export function lireEvaluationsEleve(
   wb: XLSX.WorkBook,
-  eleve: EleveInfo
-): Array<{ bloc: number; notes: Record<string, number | null>; meta: string | null }> {
-  const ws = wb.Sheets[eleve.classe];
+  nom: string,
+  prenom: string
+): BlocEvaluation[] {
+  const nomOnglet = _nomOngletEleve(nom, prenom);
+  const ws = wb.Sheets[nomOnglet];
   if (!ws) return [];
 
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, {
@@ -228,40 +371,53 @@ export function lireNotesEleve(
     defval: null,
   }) as (string | number | null)[][];
 
-  const colReelle = eleve.colIndex + 1;
-  const resultats = [];
+  const blocs: BlocEvaluation[] = [];
+  let i = 0;
 
-  for (let b = 0; b < BLOCS_START.length; b++) {
-    const blocStart = BLOCS_START[b];
-    const notes: Record<string, number | null> = {};
-    let hasData = false;
+  while (i < rows.length) {
+    const row = rows[i];
+    // Détecter une ligne "Date"
+    if (row && String(row[0] || "").toLowerCase() === "date") {
+      const date = String(row[1] || "");
+      const equipement = String(row[3] || "");
+      const notes: Record<string, number | null> = {};
+      let noteGlobale: number | null = null;
+      i++;
 
-    for (let i = 0; i < CODES_COMPETENCES.length; i++) {
-      const code = CODES_COMPETENCES[i];
-      const rowIdx = blocStart + i;
-      const val = rows[rowIdx]?.[colReelle];
-      if (val !== null && val !== undefined && val !== "") {
-        notes[code] = Number(val);
-        hasData = true;
-      } else {
-        notes[code] = null;
+      // Lire les lignes suivantes jusqu'à la ligne vide
+      while (i < rows.length) {
+        const r = rows[i];
+        if (!r || (r[0] === null && r[1] === null)) break;
+
+        const label = String(r[0] || "").trim();
+        const val = r[1];
+
+        if (label === "Note globale /20") {
+          noteGlobale = val !== null && val !== "" ? Number(val) : null;
+        } else if (CODES_COMPETENCES.includes(label)) {
+          notes[label] = val !== null && val !== "" ? Number(val) : null;
+        }
+        i++;
       }
-    }
 
-    // Lire la métadonnée (ligne vide avant le bloc)
-    const metaRowIdx = blocStart - 1;
-    const meta = metaRowIdx >= 0 ? String(rows[metaRowIdx]?.[colReelle] || "") || null : null;
-
-    if (hasData) {
-      resultats.push({ bloc: b + 1, notes, meta });
+      if (date) {
+        blocs.push({ date, equipement, notes, noteGlobale });
+      }
+    } else {
+      i++;
     }
   }
 
-  return resultats;
+  return blocs;
 }
 
-// Ancienne fonction conservée pour compatibilité
-export async function lireElevesDepuisExcel(file: File): Promise<Array<{ nom: string; prenom: string; classe?: string }>> {
+// ─────────────────────────────────────────────────────────────
+//  COMPATIBILITÉ — fonctions conservées pour l'import élèves
+// ─────────────────────────────────────────────────────────────
+
+export async function lireElevesDepuisExcel(
+  file: File
+): Promise<Array<{ nom: string; prenom: string; classe?: string }>> {
   const grille = await lireFichierGrille(file);
   const eleves: Array<{ nom: string; prenom: string; classe?: string }> = [];
   for (const classe of grille.classes) {
@@ -271,5 +427,3 @@ export async function lireElevesDepuisExcel(file: File): Promise<Array<{ nom: st
   }
   return eleves;
 }
-
-export type { XLSX };

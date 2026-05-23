@@ -21,6 +21,7 @@
  */
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { calculerNotesEpreuves, calculerMoyenneBac, EPREUVES_BAC } from "./epreuvesBac";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -178,6 +179,7 @@ export function enregistrerEvaluation(
 ): XLSX.WorkBook {
   wb = _mettreAJourOngletClasse(wb, entree);
   wb = _mettreAJourOngletEleve(wb, entree);
+  wb = _mettreAJourOngletEpreuves(wb, entree);
   return wb;
 }
 
@@ -305,6 +307,106 @@ function _mettreAJourOngletEleve(
   wb.Sheets[nomOnglet] = ws;
   if (!wb.SheetNames.includes(nomOnglet)) {
     wb.SheetNames.push(nomOnglet);
+  }
+
+  return wb;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ONGLET RÉCAPITULATIF DES ÉPREUVES DU BAC
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Onglet "Récap Bac" (créé ou mis à jour) :
+ *  Colonnes : Classe | Nom | Prénom | Date | Équipement | E2 /20 | E31 /20 | E32 /20 | Moy. Bac /20
+ *  1 ligne par élève, mise à jour à chaque enregistrement
+ */
+function _mettreAJourOngletEpreuves(
+  wb: XLSX.WorkBook,
+  entree: EntreeEvaluation
+): XLSX.WorkBook {
+  const NOM_ONGLET = "Récap Bac";
+  const { classe, nom, prenom, notesParCompetence, noteGlobale, date, equipement } = entree;
+
+  // Calculer les notes E2, E31, E32
+  const resultats = calculerNotesEpreuves(notesParCompetence);
+  const moyBac = calculerMoyenneBac(resultats);
+  const noteE2  = resultats.find((r) => r.id === "E2")?.note ?? null;
+  const noteE31 = resultats.find((r) => r.id === "E31")?.note ?? null;
+  const noteE32 = resultats.find((r) => r.id === "E32")?.note ?? null;
+
+  let rows: (string | number | null)[][] = [];
+
+  if (wb.Sheets[NOM_ONGLET]) {
+    rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[NOM_ONGLET], {
+      header: 1,
+      defval: null,
+    }) as (string | number | null)[][];
+  }
+
+  // En-tête
+  const header = ["Classe", "Nom", "Prénom", "Date", "Équipement",
+    "E2 /20", "E31 /20", "E32 /20", "Moy. Bac /20", "Note globale /20"];
+  if (rows.length === 0) {
+    rows.push(header);
+  } else {
+    rows[0] = header;
+  }
+
+  // Chercher si l'élève existe déjà
+  let ligneEleve = -1;
+  for (let i = 1; i < rows.length; i++) {
+    const a = String(rows[i][1] || "").toUpperCase().trim();
+    const b = String(rows[i][2] || "").toUpperCase().trim();
+    const c = String(rows[i][0] || "").trim();
+    if (a === nom.toUpperCase() && b === prenom.toUpperCase() && c === classe) {
+      ligneEleve = i;
+      break;
+    }
+  }
+
+  const ligne: (string | number | null)[] = [
+    classe,
+    nom,
+    prenom,
+    date,
+    equipement || "",
+    noteE2  !== null ? noteE2  : "",
+    noteE31 !== null ? noteE31 : "",
+    noteE32 !== null ? noteE32 : "",
+    moyBac  !== null ? moyBac  : "",
+    noteGlobale !== null ? noteGlobale : "",
+  ];
+
+  if (ligneEleve >= 0) {
+    rows[ligneEleve] = ligne;
+  } else {
+    rows.push(ligne);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 8  }, // Classe
+    { wch: 18 }, // Nom
+    { wch: 16 }, // Prénom
+    { wch: 12 }, // Date
+    { wch: 24 }, // Équipement
+    { wch: 10 }, // E2
+    { wch: 10 }, // E31
+    { wch: 10 }, // E32
+    { wch: 12 }, // Moy. Bac
+    { wch: 14 }, // Note globale
+  ];
+
+  wb.Sheets[NOM_ONGLET] = ws;
+  if (!wb.SheetNames.includes(NOM_ONGLET)) {
+    // Insérer après les onglets classes, avant les onglets élèves
+    const premierOngletEleve = wb.SheetNames.findIndex((n) => n.includes(" ") && !n.startsWith("Récap"));
+    if (premierOngletEleve >= 0) {
+      wb.SheetNames.splice(premierOngletEleve, 0, NOM_ONGLET);
+    } else {
+      wb.SheetNames.push(NOM_ONGLET);
+    }
   }
 
   return wb;

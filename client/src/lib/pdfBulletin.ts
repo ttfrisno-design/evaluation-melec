@@ -6,6 +6,7 @@
 
 import { COMPETENCES } from "./competences";
 import type { BlocEvaluation } from "./excelUtils";
+import { calculerNotesEpreuves, calculerMoyenneBac, EPREUVES_BAC } from "./epreuvesBac";
 
 export interface DonneesBulletin {
   nom: string;
@@ -70,6 +71,38 @@ function genererHTML(data: DonneesBulletin): string {
 
   const { bg: globalBg, text: globalText, border: globalBorder } = noteColor(evalNoteGlobale);
   const mention = getMention(evalNoteGlobale);
+
+  // Calcul des notes d'épreuves du Bac
+  const resultatsEpreuves = calculerNotesEpreuves(evalNotes);
+  const moyenneBac = calculerMoyenneBac(resultatsEpreuves);
+  const { bg: bacBg, text: bacText } = noteColor(moyenneBac);
+
+  // Tableau HTML des épreuves
+  const lignesEpreuves = resultatsEpreuves.map((ep) => {
+    const { bg, text, border } = noteColor(ep.note);
+    const detailComps = ep.detailComps
+      .filter((c) => c.noteSur20 !== null)
+      .map((c) => `${c.code}:${fmt(c.noteSur20)}`)
+      .join(" · ");
+    return `
+      <tr>
+        <td style="font-weight:900; font-size:13pt; color:${ep.couleur}; padding:8px 12px; white-space:nowrap">${ep.id}</td>
+        <td style="padding:8px 12px; color:#57534E; font-size:9pt">${ep.libelle}</td>
+        <td style="padding:8px 12px; text-align:center; white-space:nowrap">
+          <span style="font-size:8pt; font-weight:600; background:${ep.couleur}18; color:${ep.couleur}; padding:2px 8px; border-radius:20px">coef ${ep.coefBac}</span>
+        </td>
+        <td style="padding:8px 12px; text-align:center">
+          ${ep.note !== null
+            ? `<span style="background:${bg}; color:${text}; border:1px solid ${border}; padding:4px 10px; border-radius:8px; font-weight:900; font-size:12pt; font-family:'Segoe UI',Arial">${fmt(ep.note)}<span style="font-size:8pt;font-weight:400;opacity:0.7">/20</span></span>`
+            : `<span style="color:#D1D5DB">—</span>`
+          }
+        </td>
+        <td style="padding:8px 12px; font-size:8pt; color:#A8A29E">
+          ${ep.nbCompDisponibles}/${ep.nbCompTotal} comp.
+          ${detailComps ? `<br><span style="color:#78716C">${detailComps}</span>` : ""}
+        </td>
+      </tr>`;
+  }).join("");
 
   // Lignes des compétences
   const lignesComps = compsEvaluees.map((comp) => {
@@ -416,6 +449,35 @@ function genererHTML(data: DonneesBulletin): string {
     }).filter(Boolean).join(" + ")}
     ÷ ${totalCoefs?.toFixed(1) || compsEvaluees.reduce((s, c) => s + c.coef, 0).toFixed(1)}
     = <strong>${fmt(evalNoteGlobale)}/20</strong>
+  </div>` : ""}
+
+  <!-- Notes d'épreuves du Bac -->
+  ${resultatsEpreuves.some((ep) => ep.note !== null) ? `
+  <div class="section-title">Notes d'épreuves du Bac Pro MELEC</div>
+  <table style="width:100%; border-collapse:collapse; margin-bottom:8px">
+    <thead>
+      <tr style="background:#F8FAFC; border-bottom:2px solid #E7E5E4">
+        <th style="text-align:left; padding:7px 12px; font-size:9pt; font-weight:700; color:#78716C; text-transform:uppercase; letter-spacing:0.5px">Épreuve</th>
+        <th style="text-align:left; padding:7px 12px; font-size:9pt; font-weight:700; color:#78716C; text-transform:uppercase; letter-spacing:0.5px">Intitulé</th>
+        <th style="text-align:center; padding:7px 12px; font-size:9pt; font-weight:700; color:#78716C; text-transform:uppercase; letter-spacing:0.5px">Coef Bac</th>
+        <th style="text-align:center; padding:7px 12px; font-size:9pt; font-weight:700; color:#78716C; text-transform:uppercase; letter-spacing:0.5px">Note /20</th>
+        <th style="text-align:left; padding:7px 12px; font-size:9pt; font-weight:700; color:#78716C; text-transform:uppercase; letter-spacing:0.5px">Compétences</th>
+      </tr>
+    </thead>
+    <tbody>${lignesEpreuves}</tbody>
+    ${moyenneBac !== null ? `
+    <tfoot>
+      <tr style="background:${bacBg}; border-top:2px solid ${bacText}30">
+        <td colspan="3" style="padding:8px 12px; font-weight:700; font-size:10pt; color:${bacText}">Moyenne Bac pondérée (E2×3 + E31×7 + E32×2)</td>
+        <td style="padding:8px 12px; text-align:center">
+          <span style="font-weight:900; font-size:14pt; color:${bacText}; font-family:'Segoe UI',Arial">${fmt(moyenneBac)}<span style="font-size:9pt;font-weight:400;opacity:0.7">/20</span></span>
+        </td>
+        <td></td>
+      </tr>
+    </tfoot>` : ""}
+  </table>
+  <div style="font-size:8pt; color:#A8A29E; text-align:right; margin-bottom:12px; font-style:italic">
+    ${EPREUVES_BAC.map((ep) => `${ep.id} = ${ep.competences.map((c) => `${c.code}/${c.poids}`).join("+")}`).join(" · ")}
   </div>` : ""}
 
   <!-- Historique -->

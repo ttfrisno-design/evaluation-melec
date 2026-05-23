@@ -1255,11 +1255,13 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       {showGestionEleves && fichierGrille && (
         <GestionEleves
           fichierGrille={fichierGrille}
+          fichierNom={fichierNom}
+          driveConnecte={driveState.connected}
+          onSyncDrive={driveState.connected && driveState.accessToken ? syncWithDrive : undefined}
           onClose={() => setShowGestionEleves(false)}
           onGrilleChange={(nouvelleGrille) => {
             setFichierGrilleLocal(nouvelleGrille);
             onFichierGrilleChange?.(nouvelleGrille);
-            // Mettre à jour la liste des élèves de la classe active
             const classe = nouvelleGrille.classes.find((c) => c.nom === classeSelectionnee);
             if (classe) {
               setEleves(classe.eleves.map((e) => ({ nom: e.nom, prenom: e.prenom, classe: e.classe })));

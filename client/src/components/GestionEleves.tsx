@@ -16,11 +16,21 @@ import * as XLSX from "xlsx";
 
 interface Props {
   fichierGrille: FichierGrille;
+  fichierNom: string;
   onClose: () => void;
   onGrilleChange: (grille: FichierGrille) => void;
+  onSyncDrive?: (blob: Blob) => Promise<void>;
+  driveConnecte?: boolean;
 }
 
-export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }: Props) {
+export default function GestionEleves({
+  fichierGrille,
+  fichierNom,
+  onClose,
+  onGrilleChange,
+  onSyncDrive,
+  driveConnecte = false,
+}: Props) {
   // Formulaire ajout élève
   const [nomNouvel, setNomNouvel] = useState("");
   const [prenomNouvel, setPrenomNouvel] = useState("");
@@ -35,6 +45,8 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
   const [classeImport, setClasseImport] = useState(fichierGrille.classes[0]?.nom || "");
   const [csvPreview, setCsvPreview] = useState<Array<{ nom: string; prenom: string; valide: boolean; erreur?: string }>>([]);
   const [csvTexte, setCsvTexte] = useState("");
+  const [syncAuto, setSyncAuto] = useState(true); // sync automatique après import
+  const [isSyncing, setIsSyncing] = useState(false);
   const fileInputCsvRef = useRef<HTMLInputElement>(null);
 
   // UI
@@ -219,8 +231,8 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
     e.target.value = "";
   };
 
-  /** Importer tous les élèves valides dans la classe */
-  const handleImporterCSV = () => {
+  /** Importer tous les élèves valides et synchroniser si demandé */
+  const handleImporterCSV = async () => {
     const valides = csvPreview.filter((e) => e.valide);
     if (valides.length === 0) {
       showMsg("Aucun élève valide à importer.", "error");
@@ -239,11 +251,39 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
     }
 
     appliquerChangement(wb);
-    showMsg(`${nbAjoutes} élève(s) importé(s) dans la classe ${classeImport}.`, "success");
     setCsvPreview([]);
     setCsvTexte("");
     setShowImportCSV(false);
     setClasseOuverte(classeImport);
+
+    // Synchronisation automatique si activée
+    if (syncAuto) {
+      setIsSyncing(true);
+      try {
+        // Générer le blob du fichier mis à jour
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([wbout], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        if (driveConnecte && onSyncDrive) {
+          // Synchroniser avec Google Drive
+          await onSyncDrive(blob);
+          showMsg(`✓ ${nbAjoutes} élève(s) importé(s) et synchronisés sur Google Drive.`, "success");
+        } else {
+          // Télécharger localement
+          const { saveAs } = await import("file-saver");
+          saveAs(blob, fichierNom);
+          showMsg(`✓ ${nbAjoutes} élève(s) importé(s). Fichier téléchargé.`, "success");
+        }
+      } catch (err) {
+        showMsg(`Import réussi mais erreur de synchronisation : ${String(err instanceof Error ? err.message : err)}`, "error");
+      } finally {
+        setIsSyncing(false);
+      }
+    } else {
+      showMsg(`✓ ${nbAjoutes} élève(s) importé(s) dans la classe ${classeImport}.`, "success");
+    }
   };
 
   const totalEleves = fichierGrille.classes.reduce((s, c) => s + c.eleves.length, 0);
@@ -446,16 +486,69 @@ export default function GestionEleves({ fichierGrille, onClose, onGrilleChange }
                   </div>
                 )}
 
-                {/* Bouton importer */}
+                {/* Option synchronisation automatique */}
                 {csvPreview.filter((e) => e.valide).length > 0 && (
-                  <button
-                    onClick={handleImporterCSV}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
-                    style={{ background: "#2563EB", color: "white" }}
-                  >
-                    <Upload size={14} />
-                    Importer {csvPreview.filter((e) => e.valide).length} élève(s) dans {classeImport}
-                  </button>
+                  <div className="space-y-2">
+                    {/* Toggle sync auto */}
+                    <div
+                      className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+                      style={{ background: syncAuto ? (driveConnecte ? "#f0fdf4" : "#EFF6FF") : "#FAFAF9", border: `1px solid ${syncAuto ? (driveConnecte ? "#86efac" : "#BFDBFE") : "#E7E5E4"}` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{driveConnecte ? "☁️" : "💾"}</span>
+                        <div>
+                          <p className="text-xs font-semibold" style={{ color: syncAuto ? (driveConnecte ? "#166534" : "#1d4ed8") : "#57534E" }}>
+                            {driveConnecte
+                              ? "Synchroniser sur Google Drive après import"
+                              : "Télécharger le fichier Excel après import"}
+                          </p>
+                          <p className="text-xs" style={{ color: driveConnecte ? "#16a34a" : "#2563EB", opacity: 0.75 }}>
+                            {driveConnecte
+                              ? "Le fichier sera mis à jour sur votre Drive"
+                              : "Le fichier mis à jour sera téléchargé localement"}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Toggle switch */}
+                      <button
+                        onClick={() => setSyncAuto(!syncAuto)}
+                        className="relative flex-shrink-0 w-10 h-5 rounded-full transition-all"
+                        style={{ background: syncAuto ? (driveConnecte ? "#16a34a" : "#2563EB") : "#D1D5DB" }}
+                      >
+                        <div
+                          className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                          style={{ left: syncAuto ? "calc(100% - 18px)" : "2px" }}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Bouton importer */}
+                    <button
+                      onClick={handleImporterCSV}
+                      disabled={isSyncing}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-60"
+                      style={{ background: "#2563EB", color: "white" }}
+                    >
+                      {isSyncing ? (
+                        <>
+                          <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeDasharray="60" strokeDashoffset="20" />
+                          </svg>
+                          Synchronisation en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={14} />
+                          Importer {csvPreview.filter((e) => e.valide).length} élève(s)
+                          {syncAuto && (
+                            <span className="text-xs opacity-80 ml-1">
+                              + {driveConnecte ? "sync Drive" : "télécharger"}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
             )}

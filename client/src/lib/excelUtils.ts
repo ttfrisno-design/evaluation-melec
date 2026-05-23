@@ -59,6 +59,7 @@ export interface BlocEvaluation {
   equipement: string;
   notes: Record<string, number | null>;
   noteGlobale: number | null;
+  commentaire?: string;
 }
 
 const CODES_COMPETENCES = [
@@ -337,6 +338,7 @@ export function lireEvaluationsEleve(
     if (label === "date") {
       const date = String(row[1] || "");
       let equipement = "";
+      let commentaireBloc = "";
       const notes: Record<string, number | null> = {};
       let noteGlobale: number | null = null;
       i++;
@@ -350,7 +352,8 @@ export function lireEvaluationsEleve(
         if (lbl.toLowerCase() === "équipement") {
           equipement = String(val || "");
         } else if (lbl.toLowerCase() === "commentaire") {
-          // commentaire ignoré dans la lecture des blocs (non utilisé pour le calcul)
+          // lire le commentaire pour l'afficher dans le tableau de bord
+          if (val !== null && val !== "") commentaireBloc = String(val);
         } else if (lbl.toLowerCase() === "note /20") {
           noteGlobale = val !== null && val !== "" ? Number(val) : null;
         } else if (CODES_COMPETENCES.includes(lbl)) {
@@ -359,7 +362,13 @@ export function lireEvaluationsEleve(
         i++;
       }
 
-      if (date) blocs.push({ date, equipement, notes, noteGlobale });
+      if (date) blocs.push({
+        date,
+        equipement,
+        notes,
+        noteGlobale,
+        commentaire: commentaireBloc || undefined,
+      });
     } else {
       i++;
     }

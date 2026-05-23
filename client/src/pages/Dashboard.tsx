@@ -40,6 +40,7 @@ interface DonneeEleve {
   notesParComp: Record<string, number | null>;
   nbEvaluations: number;
   derniereDate: string;
+  dernierCommentaire?: string;
   toutesEvaluations: BlocEvaluation[];
 }
 
@@ -131,6 +132,7 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
         notesParComp,
         nbEvaluations: evaluations.length,
         derniereDate: derniere?.date || "—",
+        dernierCommentaire: derniere?.commentaire || undefined,
         toutesEvaluations: evaluations,
       };
     });
@@ -162,6 +164,7 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
           notesParComp,
           nbEvaluations: evaluations.length,
           derniereDate: derniere?.date || "—",
+          dernierCommentaire: derniere?.commentaire || undefined,
           toutesEvaluations: evaluations,
         });
       }
@@ -433,6 +436,20 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                 )}
               </div>
 
+              {/* Dernier commentaire */}
+              {eleveSelectionne.dernierCommentaire && (
+                <div
+                  className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-4"
+                  style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}
+                >
+                  <span className="text-base flex-shrink-0 mt-0.5">💬</span>
+                  <div>
+                    <p className="text-xs font-semibold text-stone-400 mb-0.5">Dernier commentaire</p>
+                    <p className="text-sm text-stone-700">{eleveSelectionne.dernierCommentaire}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Historique des évaluations */}
               {eleveSelectionne.toutesEvaluations.length > 1 && (
                 <div>
@@ -457,6 +474,11 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                           </span>
                         ) : (
                           <span className="text-xs text-stone-300">—</span>
+                        )}
+                        {eval_.commentaire && (
+                          <p className="text-xs text-stone-400 mt-1.5 leading-tight line-clamp-2" title={eval_.commentaire}>
+                            💬 {eval_.commentaire}
+                          </p>
                         )}
                       </div>
                     ))}
@@ -643,10 +665,51 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                         })}
                         <td className="text-center px-3 py-2.5" style={{ borderLeft: "2px solid #F5F5F4" }}>
                           {eleve.noteGlobale !== null ? (
-                            <span className="inline-block px-2 py-1 rounded-lg text-sm font-black tabular-nums"
-                              style={{ background: bgNote(eleve.noteGlobale), color: couleurNote(eleve.noteGlobale), fontFamily: "'Outfit', sans-serif" }}>
-                              {eleve.noteGlobale.toFixed(2)}
-                            </span>
+                            <div className="relative inline-block group">
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-black tabular-nums cursor-default"
+                                style={{ background: bgNote(eleve.noteGlobale), color: couleurNote(eleve.noteGlobale), fontFamily: "'Outfit', sans-serif" }}
+                              >
+                                {eleve.noteGlobale.toFixed(2)}
+                                {eleve.dernierCommentaire && (
+                                  <span className="text-[10px] opacity-60">💬</span>
+                                )}
+                              </span>
+                              {/* Infobulle commentaire */}
+                              {eleve.dernierCommentaire && (
+                                <div
+                                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30
+                                             opacity-0 group-hover:opacity-100 pointer-events-none
+                                             transition-opacity duration-150"
+                                  style={{ minWidth: "180px", maxWidth: "260px" }}
+                                >
+                                  <div
+                                    className="rounded-xl px-3 py-2 text-xs shadow-xl"
+                                    style={{
+                                      background: "#1C1917",
+                                      color: "#F5F5F4",
+                                      lineHeight: "1.5",
+                                    }}
+                                  >
+                                    <p className="font-semibold text-stone-300 mb-0.5">Commentaire</p>
+                                    <p>{eleve.dernierCommentaire}</p>
+                                    {eleve.derniereDate !== "—" && (
+                                      <p className="text-stone-500 mt-1 text-[10px]">{eleve.derniereDate}</p>
+                                    )}
+                                  </div>
+                                  {/* Flèche */}
+                                  <div
+                                    className="absolute left-1/2 -translate-x-1/2 top-full"
+                                    style={{
+                                      width: 0, height: 0,
+                                      borderLeft: "6px solid transparent",
+                                      borderRight: "6px solid transparent",
+                                      borderTop: "6px solid #1C1917",
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-stone-300 text-xs">—</span>
                           )}

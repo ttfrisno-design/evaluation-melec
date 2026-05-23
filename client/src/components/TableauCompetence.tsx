@@ -20,8 +20,9 @@ interface Props {
 
 export default function TableauCompetence({ competence, notes, onNoteChange }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  const { obtenu, max, sur20 } = calculerNoteCompetence(competence, notes);
-  const pourcentage = max > 0 ? (obtenu / max) * 100 : 0;
+  const { obtenu, max, nbNotes, sur20 } = calculerNoteCompetence(competence, notes);
+  // Pourcentage basé sur la note /20 pour la barre de progression
+  const pourcentage = sur20 !== null ? (sur20 / 20) * 100 : 0;
 
   const getBarColor = (pct: number) => {
     if (pct >= 80) return "#16a34a";
@@ -234,7 +235,7 @@ export default function TableauCompetence({ competence, notes, onNoteChange }: P
                       Note {competence.code} ramenée sur 20
                     </td>
                     <td className="px-4 py-2.5 text-center text-xs" style={{ color: sur20 !== null ? text : "#78716C", opacity: 0.7 }} colSpan={2}>
-                      {obtenu} ÷ {max} × 20
+                      {nbNotes > 0 ? `Σ${obtenu} / ${nbNotes} critère(s)` : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <span

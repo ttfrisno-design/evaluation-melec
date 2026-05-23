@@ -281,7 +281,10 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
         commentaire: commentaire.trim() || undefined,
       });
 
-      setFichierGrille({ ...fichierGrille, rawWorkbook: wbMaj });
+      // Mettre à jour l'état local ET notifier App.tsx (pour le tableau de bord)
+      const grilleMAJ = { ...fichierGrille, rawWorkbook: wbMaj };
+      setFichierGrilleLocal(grilleMAJ);
+      onFichierGrilleChange?.(grilleMAJ);
       const blob = telechargerFichierGrille(wbMaj, fichierNom);
 
       toast.success(`✓ Notes enregistrées pour ${eleveSelectionneInfo.nom} ${eleveSelectionneInfo.prenom}.`);

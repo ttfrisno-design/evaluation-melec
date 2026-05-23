@@ -95,6 +95,7 @@ export function useEvaluation() {
       comp,
       obtenu: detail?.obtenu ?? 0,
       max: detail?.max ?? comp.noteMax,
+      nbNotes: detail?.nbNotes ?? 0,
       sur20: detail?.sur20 ?? null,
       coef: comp.coef,
     };

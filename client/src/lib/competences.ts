@@ -235,24 +235,51 @@ export const COMPETENCES: Competence[] = [
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Calcule la note brute obtenue et le barème max d'une compétence,
- * puis la ramène sur 20.
+ * Calcule la note d'une compétence sur 20.
+ *
+ * Formule : Σ(notes_critères_notés) / nb_critères_notés × 20
+ *
+ * Seuls les critères effectivement renseignés (non null) entrent dans le calcul.
+ * Exemple : C1 a 6 critères à 10 pts chacun.
+ *   Si on note 3 critères : 8, 6, 10 → Σ = 24, nb = 3 → note = 24/3 = 8/10 × 20 = 16/20
+ *   (on ne pénalise pas les critères non évalués)
+ *
+ * @returns obtenu  : somme brute des notes saisies
+ *          max     : barème total de la compétence (pour affichage)
+ *          nbNotes : nombre de critères effectivement notés
+ *          sur20   : note ramenée sur 20
  */
 export function calculerNoteCompetence(
   competence: Competence,
   notes: Record<string, number | null>
-): { obtenu: number; max: number; sur20: number | null } {
+): { obtenu: number; max: number; nbNotes: number; sur20: number | null } {
   let obtenu = 0;
   let max = 0;
+  let nbNotes = 0;
+
   for (const critere of competence.criteres) {
     const note = notes[critere.id];
+    max += critere.noteMax;
     if (note !== null && note !== undefined) {
       obtenu += note;
+      nbNotes++;
     }
-    max += critere.noteMax;
   }
-  const sur20 = max > 0 ? Math.round((obtenu / max) * 20 * 100) / 100 : null;
-  return { obtenu, max, sur20 };
+
+  // note/20 = (Σ notes saisies / nb critères notés) / (barème moyen par critère) × 20
+  // Simplifié : sur20 = (obtenu / nbNotes) / (max / nb_total_critères) × 20
+  //           = obtenu / nbNotes × (nb_total_critères / max) × 20
+  // Encore plus simple : on ramène la moyenne des notes obtenues sur le barème moyen d'un critère
+  // sur20 = (obtenu / nbNotes) / (max / nbCriteresTotal) × 20
+  const nbCriteresTotal = competence.criteres.length;
+  let sur20: number | null = null;
+  if (nbNotes > 0 && nbCriteresTotal > 0 && max > 0) {
+    const moyenneObtenue = obtenu / nbNotes;          // moyenne des notes saisies
+    const baremeParCritere = max / nbCriteresTotal;   // barème moyen d'un critère
+    sur20 = Math.round((moyenneObtenue / baremeParCritere) * 20 * 100) / 100;
+  }
+
+  return { obtenu, max, nbNotes, sur20 };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -276,16 +303,14 @@ export function calculerNoteGlobale(
   notes: Record<string, number | null>
 ): {
   noteGlobale: number | null;
-  notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number }>;
+  notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number; nbNotes: number }>;
   totalCoefs: number;
 } {
   if (competencesSelectionnees.length === 0) {
     return { noteGlobale: null, notesParComp: [], totalCoefs: 0 };
   }
 
-  const notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number }> = [];
-  // pts_bruts_obtenus pondérés : pour chaque comp, on convertit le brut en fraction du poids
-  // pts_pondérés_Ci = (obtenu_Ci / max_Ci) * poids_Ci
+  const notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number; nbNotes: number }> = [];
   let sommePtsPonderes = 0;
   let totalPoids = 0;
 
@@ -293,8 +318,8 @@ export function calculerNoteGlobale(
     const comp = COMPETENCES.find((c) => c.code === code);
     if (!comp) continue;
 
-    const { obtenu, max, sur20 } = calculerNoteCompetence(comp, notes);
-    notesParComp.push({ code, sur20, coef: comp.coef, obtenu, max });
+    const { obtenu, max, nbNotes, sur20 } = calculerNoteCompetence(comp, notes);
+    notesParComp.push({ code, sur20, coef: comp.coef, obtenu, max, nbNotes });
 
     // N'inclure dans la moyenne que si au moins un critère a été noté
     if (sur20 !== null && max > 0) {

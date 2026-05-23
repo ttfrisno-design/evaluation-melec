@@ -53,10 +53,12 @@ import {
   RefreshCw,
   BarChart2,
   FileText,
+  UserPlus,
 } from "lucide-react";
 import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
 import { exporterBulletinPDF } from "@/lib/pdfBulletin";
+import GestionEleves from "@/components/GestionEleves";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
@@ -115,6 +117,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [isSaving, setIsSaving] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showHistoEleve, setShowHistoEleve] = useState(false);
+  const [showGestionEleves, setShowGestionEleves] = useState(false);
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [commentaire, setCommentaire] = useState("");
@@ -660,6 +663,16 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             </div>
             {isSyncingDrive && <RefreshCw size={11} className="animate-spin" />}
           </button>
+          {/* Bouton gérer les élèves */}
+          {fichierGrille && (
+            <button
+              onClick={() => setShowGestionEleves(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: "#3C3836", color: "#D6D3D1", border: "1px solid #57534E" }}
+            >
+              <UserPlus size={13} /> Gérer les élèves
+            </button>
+          )}
           <button onClick={resetAll}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
             style={{ background: "#3C3836", color: "#A8A29E", border: "1px solid #57534E" }}
@@ -1236,6 +1249,23 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===== MODAL GESTION ÉLÈVES ===== */}
+      {showGestionEleves && fichierGrille && (
+        <GestionEleves
+          fichierGrille={fichierGrille}
+          onClose={() => setShowGestionEleves(false)}
+          onGrilleChange={(nouvelleGrille) => {
+            setFichierGrilleLocal(nouvelleGrille);
+            onFichierGrilleChange?.(nouvelleGrille);
+            // Mettre à jour la liste des élèves de la classe active
+            const classe = nouvelleGrille.classes.find((c) => c.nom === classeSelectionnee);
+            if (classe) {
+              setEleves(classe.eleves.map((e) => ({ nom: e.nom, prenom: e.prenom, classe: e.classe })));
+            }
+          }}
+        />
       )}
     </div>
   );

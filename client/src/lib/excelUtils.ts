@@ -405,3 +405,181 @@ export function creerWorkbookVide(classes: string[]): XLSX.WorkBook {
   }
   return wb;
 }
+
+// ─────────────────────────────────────────────────────────────
+//  GESTION DES ÉLÈVES ET DES CLASSES
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Ajoute un élève dans l'onglet classe du workbook.
+ * Crée l'onglet classe s'il n'existe pas encore.
+ * Retourne false si l'élève existe déjà dans la classe.
+ */
+export function ajouterEleve(
+  wb: XLSX.WorkBook,
+  nom: string,
+  prenom: string,
+  classe: string
+): { wb: XLSX.WorkBook; succes: boolean; message: string } {
+  const nomNorm = nom.trim().toUpperCase();
+  const prenomNorm = prenom.trim();
+
+  if (!nomNorm) {
+    return { wb, succes: false, message: "Le nom est obligatoire." };
+  }
+  if (!classe.trim()) {
+    return { wb, succes: false, message: "La classe est obligatoire." };
+  }
+
+  let rows: (string | number | null)[][] = [];
+
+  if (wb.Sheets[classe]) {
+    rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[classe], {
+      header: 1,
+      defval: null,
+    }) as (string | number | null)[][];
+  }
+
+  // En-tête si absent
+  if (rows.length === 0) {
+    rows.push(["Nom", "Prénom", "Note /20"]);
+  }
+
+  // Vérifier si l'élève existe déjà
+  for (let i = 1; i < rows.length; i++) {
+    const a = String(rows[i][0] || "").toUpperCase().trim();
+    const b = String(rows[i][1] || "").toLowerCase().trim();
+    if (a === nomNorm && b === prenomNorm.toLowerCase()) {
+      return { wb, succes: false, message: `${nomNorm} ${prenomNorm} existe déjà dans la classe ${classe}.` };
+    }
+  }
+
+  // Ajouter l'élève
+  rows.push([nomNorm, prenomNorm, null]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }];
+  wb.Sheets[classe] = ws;
+
+  if (!wb.SheetNames.includes(classe)) {
+    // Insérer la classe en premier (avant les onglets élèves)
+    const premierOngletEleve = wb.SheetNames.findIndex((n) => n.includes(" "));
+    if (premierOngletEleve >= 0) {
+      wb.SheetNames.splice(premierOngletEleve, 0, classe);
+    } else {
+      wb.SheetNames.unshift(classe);
+    }
+  }
+
+  return { wb, succes: true, message: `${nomNorm} ${prenomNorm} ajouté(e) à la classe ${classe}.` };
+}
+
+/**
+ * Supprime un élève de l'onglet classe et supprime son onglet dédié.
+ * Retourne false si l'élève n'est pas trouvé.
+ */
+export function supprimerEleve(
+  wb: XLSX.WorkBook,
+  nom: string,
+  prenom: string,
+  classe: string
+): { wb: XLSX.WorkBook; succes: boolean; message: string } {
+  const nomNorm = nom.trim().toUpperCase();
+  const prenomNorm = prenom.trim();
+
+  // Supprimer de l'onglet classe
+  if (wb.Sheets[classe]) {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[classe], {
+      header: 1,
+      defval: null,
+    }) as (string | number | null)[][];
+
+    const ligneIdx = rows.findIndex((row, i) => {
+      if (i === 0) return false;
+      const a = String(row[0] || "").toUpperCase().trim();
+      const b = String(row[1] || "").toLowerCase().trim();
+      return a === nomNorm && b === prenomNorm.toLowerCase();
+    });
+
+    if (ligneIdx < 0) {
+      return { wb, succes: false, message: `${nomNorm} ${prenomNorm} introuvable dans la classe ${classe}.` };
+    }
+
+    rows.splice(ligneIdx, 1);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }];
+    wb.Sheets[classe] = ws;
+  }
+
+  // Supprimer l'onglet élève s'il existe
+  const nomOnglet = `${nomNorm} ${prenomNorm}`.slice(0, 31);
+  if (wb.Sheets[nomOnglet]) {
+    delete wb.Sheets[nomOnglet];
+    wb.SheetNames = wb.SheetNames.filter((n) => n !== nomOnglet);
+  }
+
+  return { wb, succes: true, message: `${nomNorm} ${prenomNorm} supprimé(e) de la classe ${classe}.` };
+}
+
+/**
+ * Ajoute une nouvelle classe (onglet) dans le workbook.
+ * Retourne false si la classe existe déjà.
+ */
+export function ajouterClasse(
+  wb: XLSX.WorkBook,
+  nomClasse: string
+): { wb: XLSX.WorkBook; succes: boolean; message: string } {
+  const nom = nomClasse.trim();
+  if (!nom) return { wb, succes: false, message: "Le nom de la classe est obligatoire." };
+  if (wb.SheetNames.includes(nom)) {
+    return { wb, succes: false, message: `La classe "${nom}" existe déjà.` };
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet([["Nom", "Prénom", "Note /20"]]);
+  ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }];
+
+  // Insérer avant les onglets élèves
+  const premierOngletEleve = wb.SheetNames.findIndex((n) => n.includes(" "));
+  if (premierOngletEleve >= 0) {
+    wb.SheetNames.splice(premierOngletEleve, 0, nom);
+  } else {
+    wb.SheetNames.push(nom);
+  }
+  wb.Sheets[nom] = ws;
+
+  return { wb, succes: true, message: `Classe "${nom}" créée.` };
+}
+
+/**
+ * Supprime une classe et tous ses élèves du workbook.
+ */
+export function supprimerClasse(
+  wb: XLSX.WorkBook,
+  nomClasse: string
+): { wb: XLSX.WorkBook; succes: boolean; message: string } {
+  if (!wb.SheetNames.includes(nomClasse)) {
+    return { wb, succes: false, message: `La classe "${nomClasse}" n'existe pas.` };
+  }
+
+  // Récupérer les élèves de la classe pour supprimer leurs onglets
+  const ws = wb.Sheets[nomClasse];
+  if (ws) {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null }) as (string | null)[][];
+    for (let i = 1; i < rows.length; i++) {
+      const nom = String(rows[i][0] || "").toUpperCase().trim();
+      const prenom = String(rows[i][1] || "").trim();
+      if (nom) {
+        const nomOnglet = `${nom} ${prenom}`.slice(0, 31);
+        if (wb.Sheets[nomOnglet]) {
+          delete wb.Sheets[nomOnglet];
+          wb.SheetNames = wb.SheetNames.filter((n) => n !== nomOnglet);
+        }
+      }
+    }
+  }
+
+  delete wb.Sheets[nomClasse];
+  wb.SheetNames = wb.SheetNames.filter((n) => n !== nomClasse);
+
+  return { wb, succes: true, message: `Classe "${nomClasse}" et ses élèves supprimés.` };
+}

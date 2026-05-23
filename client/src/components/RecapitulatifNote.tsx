@@ -137,12 +137,12 @@ export default function RecapitulatifNote({
                     />
                     {/* Code compétence */}
                     <span style={{ color: couleur }}>{comp.code}</span>
-                    {/* Coefficient */}
+                    {/* Poids sur 240 */}
                     <span
                       className="px-1 rounded text-[10px] font-bold"
                       style={{ background: `${couleur}20`, color: couleur }}
                     >
-                      ×{coef}
+                      {coef}pts
                     </span>
                     <span className="text-stone-400">:</span>
                     {/* Note sur 20 */}
@@ -183,7 +183,7 @@ export default function RecapitulatifNote({
           {/* Formule de calcul */}
           {notesParCompetence.length > 0 && totalCoefs > 0 && (
             <p className="text-xs text-stone-400 mt-3">
-              Formule : Σ(note/20 × coef) ÷ Σcoef — seules les compétences notées sont incluses
+              Formule : Σ(pts_obtenus_Ci / pts_max_Ci × poids_Ci) ÷ Σpoids_évalués × 20 — pondération sur {totalCoefs.toFixed(1)} pts
             </p>
           )}
         </div>

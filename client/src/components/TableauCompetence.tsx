@@ -77,12 +77,12 @@ export default function TableauCompetence({ competence, notes, onNoteChange }: P
           >
             {competence.libelle}
           </span>
-          {/* Coefficient */}
+          {/* Poids sur 240 */}
           <span
             className="flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded"
             style={{ background: `${competence.couleur}20`, color: competence.couleur }}
           >
-            coef {competence.coef}
+            {competence.coef} pts/240
           </span>
         </div>
 

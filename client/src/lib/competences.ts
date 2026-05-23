@@ -24,15 +24,16 @@ export interface Competence {
   couleur: string;
 }
 
-// Coefficients issus de la grille d'évaluation MELEC
-// (basés sur les épreuves E2-1, E2-2, E31, E32, E33 et leurs coefs)
+// Poids de chaque compétence sur le total de 240 points
+// fournis par l'utilisateur : C1=18, C2=25.2, C3=12, C4=42...
+// La note globale = Σ(pts_bruts_obtenus) / Σ(poids_compétences_évaluées) × 20
 export const COMPETENCES: Competence[] = [
   {
     id: "c1",
     code: "C1",
     libelle: "ANALYSER LES CONDITIONS DE L'OPÉRATION ET SON CONTEXTE",
     noteMax: 60,
-    coef: 3,
+    coef: 18,   // poids sur 240
     couleur: "#2563EB",
     criteres: [
       { id: "c1_1", libelle: "Les symboles sont identifiés", noteMax: 10, note: null },
@@ -48,7 +49,7 @@ export const COMPETENCES: Competence[] = [
     code: "C2",
     libelle: "ORGANISER L'OPÉRATION DANS SON CONTEXTE",
     noteMax: 60,
-    coef: 4,
+    coef: 25.2, // poids sur 240
     couleur: "#7C3AED",
     criteres: [
       { id: "c2_1", libelle: "Poste organisé pendant le câblage", noteMax: 10, note: null },
@@ -63,7 +64,7 @@ export const COMPETENCES: Competence[] = [
     code: "C3",
     libelle: "DÉFINIR UNE INSTALLATION À L'AIDE DE SOLUTIONS PRÉÉTABLIES",
     noteMax: 40,
-    coef: 3,
+    coef: 12,   // poids sur 240
     couleur: "#059669",
     criteres: [
       { id: "c3_1", libelle: "Le schéma proposé est conforme", noteMax: 10, note: null },
@@ -77,7 +78,7 @@ export const COMPETENCES: Competence[] = [
     code: "C4",
     libelle: "RÉALISER UNE INSTALLATION DE MANIÈRE ÉCO-RESPONSABLE",
     noteMax: 100,
-    coef: 4,
+    coef: 42,   // poids sur 240
     couleur: "#D97706",
     criteres: [
       { id: "c4_1", libelle: "Esthétique industrielle", noteMax: 10, note: null },
@@ -93,7 +94,7 @@ export const COMPETENCES: Competence[] = [
     code: "C5",
     libelle: "CONTRÔLER LES GRANDEURS CARACTÉRISTIQUES DE L'INSTALLATION",
     noteMax: 50,
-    coef: 3,
+    coef: 14,   // poids sur 240
     couleur: "#DC2626",
     criteres: [
       { id: "c5_1", libelle: "Choix de l'appareil de mesure", noteMax: 10, note: null },
@@ -108,7 +109,7 @@ export const COMPETENCES: Competence[] = [
     code: "C6",
     libelle: "RÉGLER, PARAMÉTRER LES MATÉRIELS DE L'INSTALLATION",
     noteMax: 50,
-    coef: 3,
+    coef: 14,   // poids sur 240
     couleur: "#0891B2",
     criteres: [
       { id: "c6_1", libelle: "Réglage des protections thermiques, temporisations", noteMax: 10, note: null },
@@ -123,7 +124,7 @@ export const COMPETENCES: Competence[] = [
     code: "C7",
     libelle: "VALIDER LE FONCTIONNEMENT DE L'INSTALLATION",
     noteMax: 50,
-    coef: 3,
+    coef: 14,   // poids sur 240
     couleur: "#7C3AED",
     criteres: [
       { id: "c7_1", libelle: "Mise en énergie maîtrisée", noteMax: 10, note: null },
@@ -138,7 +139,7 @@ export const COMPETENCES: Competence[] = [
     code: "C8",
     libelle: "DIAGNOSTIQUER UN DYSFONCTIONNEMENT",
     noteMax: 140,
-    coef: 2,
+    coef: 28,   // poids sur 240
     couleur: "#BE185D",
     criteres: [
       { id: "c8_1", libelle: "Mise en évidence de la panne", noteMax: 10, note: null },
@@ -158,7 +159,7 @@ export const COMPETENCES: Competence[] = [
     code: "C9",
     libelle: "REMPLACER UN MATÉRIEL ÉLECTRIQUE",
     noteMax: 60,
-    coef: 2,
+    coef: 12,   // poids sur 240
     couleur: "#065F46",
     criteres: [
       { id: "c9_1", libelle: "Identification de l'appareil", noteMax: 10, note: null },
@@ -173,7 +174,7 @@ export const COMPETENCES: Competence[] = [
     code: "C10",
     libelle: "EXPLOITER LES OUTILS NUMÉRIQUES DANS LE CONTEXTE PRO",
     noteMax: 60,
-    coef: 3,
+    coef: 18,   // poids sur 240
     couleur: "#1D4ED8",
     criteres: [
       { id: "c10_1", libelle: "Utilisation See Electrical Expert", noteMax: 10, note: null },
@@ -189,7 +190,7 @@ export const COMPETENCES: Competence[] = [
     code: "C11",
     libelle: "COMPLÉTER LES DOCUMENTS LIÉS AUX OPÉRATIONS",
     noteMax: 40,
-    coef: 3,
+    coef: 12,   // poids sur 240
     couleur: "#92400E",
     criteres: [
       { id: "c11_1", libelle: "Les documents sont complétés totalement", noteMax: 10, note: null },
@@ -203,7 +204,7 @@ export const COMPETENCES: Competence[] = [
     code: "C12",
     libelle: "COMMUNIQUER ENTRE PROFESSIONNELS SUR L'OPÉRATION",
     noteMax: 40,
-    coef: 4,
+    coef: 16.8, // poids sur 240
     couleur: "#6D28D9",
     criteres: [
       { id: "c12_1", libelle: "Utilisation des bonnes terminologies", noteMax: 10, note: null },
@@ -217,7 +218,7 @@ export const COMPETENCES: Competence[] = [
     code: "C13",
     libelle: "COMMUNIQUER AVEC LE CLIENT/USAGER SUR L'OPÉRATION",
     noteMax: 50,
-    coef: 3,
+    coef: 14,   // poids sur 240
     couleur: "#0F766E",
     criteres: [
       { id: "c13_1", libelle: "Utilisation des bonnes terminologies", noteMax: 10, note: null },
@@ -259,11 +260,14 @@ export function calculerNoteCompetence(
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Calcule la note globale de l'évaluation sur 20 en tenant compte
- * des coefficients des compétences évaluées.
+ * Calcule la note globale de l'évaluation sur 20 avec la pondération exacte.
  *
- * Formule :
- *   noteGlobale = Σ(noteSur20_Ci × coef_Ci) / Σ(coef_Ci)
+ * Chaque compétence a un poids sur 240 (ex: C1=18, C4=42...).
+ * Formule : noteGlobale = Σ(pts_bruts_obtenus_Ci) / Σ(poids_Ci_évalués) × 20
+ *
+ * Ainsi, si on évalue uniquement C1, C4 et C12 :
+ *   - Le dénominateur = 18 + 42 + 16.8 = 76.8 (pas 240)
+ *   - La note est ramenée sur ces seuls poids → toujours /20
  *
  * Seules les compétences ayant au moins un critère renseigné sont incluses.
  */
@@ -280,28 +284,31 @@ export function calculerNoteGlobale(
   }
 
   const notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number }> = [];
-  let sommeNotesCoef = 0;
-  let totalCoefs = 0;
+  // pts_bruts_obtenus pondérés : pour chaque comp, on convertit le brut en fraction du poids
+  // pts_pondérés_Ci = (obtenu_Ci / max_Ci) * poids_Ci
+  let sommePtsPonderes = 0;
+  let totalPoids = 0;
 
   for (const code of competencesSelectionnees) {
     const comp = COMPETENCES.find((c) => c.code === code);
     if (!comp) continue;
 
     const { obtenu, max, sur20 } = calculerNoteCompetence(comp, notes);
-
     notesParComp.push({ code, sur20, coef: comp.coef, obtenu, max });
 
     // N'inclure dans la moyenne que si au moins un critère a été noté
-    if (sur20 !== null) {
-      sommeNotesCoef += sur20 * comp.coef;
-      totalCoefs += comp.coef;
+    if (sur20 !== null && max > 0) {
+      // Points pondérés = fraction obtenue * poids de la compétence
+      sommePtsPonderes += (obtenu / max) * comp.coef;
+      totalPoids += comp.coef;
     }
   }
 
+  // noteGlobale = (somme pts pondérés / total poids évalués) * 20
   const noteGlobale =
-    totalCoefs > 0
-      ? Math.round((sommeNotesCoef / totalCoefs) * 100) / 100
+    totalPoids > 0
+      ? Math.round((sommePtsPonderes / totalPoids) * 20 * 100) / 100
       : null;
 
-  return { noteGlobale, notesParComp, totalCoefs };
+  return { noteGlobale, notesParComp, totalCoefs: totalPoids };
 }

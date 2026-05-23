@@ -287,14 +287,18 @@ export function calculerNoteCompetence(
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Calcule la note globale de l'évaluation sur 20 avec la pondération exacte.
+ * Calcule la note globale de l'évaluation sur 20 avec pondération par les poids sur 240.
  *
- * Chaque compétence a un poids sur 240 (ex: C1=18, C4=42...).
- * Formule : noteGlobale = Σ(pts_bruts_obtenus_Ci) / Σ(poids_Ci_évalués) × 20
+ * Formule :
+ *   noteGlobale = Σ(noteSur20_Ci × poids_Ci) / Σ(poids_Ci_évalués)
  *
- * Ainsi, si on évalue uniquement C1, C4 et C12 :
- *   - Le dénominateur = 18 + 42 + 16.8 = 76.8 (pas 240)
- *   - La note est ramenée sur ces seuls poids → toujours /20
+ * - noteSur20_Ci : note de la compétence i ramenée sur 20
+ *   (calculée avec la nouvelle formule : Σ notes critères / nb critères notés / barème moyen × 20)
+ * - poids_Ci : poids de la compétence i sur 240 (C1=18, C2=25.2, C4=42...)
+ * - Le dénominateur = somme des poids des seules compétences effectivement évaluées
+ *
+ * Exemple : C1 (poids 18) = 16/20, C4 (poids 42) = 14/20
+ *   noteGlobale = (16×18 + 14×42) / (18+42) = (288 + 588) / 60 = 876/60 = 14.60/20
  *
  * Seules les compétences ayant au moins un critère renseigné sont incluses.
  */
@@ -311,8 +315,8 @@ export function calculerNoteGlobale(
   }
 
   const notesParComp: Array<{ code: string; sur20: number | null; coef: number; obtenu: number; max: number; nbNotes: number }> = [];
-  let sommePtsPonderes = 0;
-  let totalPoids = 0;
+  let sommeNotesXPoids = 0; // Σ(noteSur20_Ci × poids_Ci)
+  let totalPoids = 0;        // Σ(poids_Ci) pour les compétences évaluées
 
   for (const code of competencesSelectionnees) {
     const comp = COMPETENCES.find((c) => c.code === code);
@@ -321,18 +325,17 @@ export function calculerNoteGlobale(
     const { obtenu, max, nbNotes, sur20 } = calculerNoteCompetence(comp, notes);
     notesParComp.push({ code, sur20, coef: comp.coef, obtenu, max, nbNotes });
 
-    // N'inclure dans la moyenne que si au moins un critère a été noté
-    if (sur20 !== null && max > 0) {
-      // Points pondérés = fraction obtenue * poids de la compétence
-      sommePtsPonderes += (obtenu / max) * comp.coef;
+    // N'inclure que les compétences avec au moins un critère noté
+    if (sur20 !== null) {
+      sommeNotesXPoids += sur20 * comp.coef;
       totalPoids += comp.coef;
     }
   }
 
-  // noteGlobale = (somme pts pondérés / total poids évalués) * 20
+  // noteGlobale = Σ(noteSur20_Ci × poids_Ci) / Σ(poids_évalués)
   const noteGlobale =
     totalPoids > 0
-      ? Math.round((sommePtsPonderes / totalPoids) * 20 * 100) / 100
+      ? Math.round((sommeNotesXPoids / totalPoids) * 100) / 100
       : null;
 
   return { noteGlobale, notesParComp, totalCoefs: totalPoids };

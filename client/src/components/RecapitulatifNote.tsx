@@ -164,7 +164,7 @@ export default function RecapitulatifNote({
           {/* Formule de calcul */}
           {notesParCompetence.length > 0 && totalCoefs > 0 && (
             <p className="text-xs text-stone-400 mt-3">
-              Formule : Σ(pts_obtenus_Ci / pts_max_Ci × poids_Ci) ÷ Σpoids_évalués × 20 — pondération sur {totalCoefs.toFixed(1)} pts
+              Formule : Σ(note_Ci/20 × poids_Ci) ÷ Σpoids_évalués — pondération sur {totalCoefs.toFixed(1)} pts/{240}
             </p>
           )}
         </div>

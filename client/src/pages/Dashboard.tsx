@@ -30,6 +30,7 @@ import {
 import { noteGradientColor } from "@/lib/noteColor";
 import { exporterBulletinPDF } from "@/lib/pdfBulletin";
 import { calculerNotesEpreuves, calculerMoyenneBac, EPREUVES_BAC, type ResultatEpreuve } from "@/lib/epreuvesBac";
+import TableauSuiviEleve from "@/components/TableauSuiviEleve";
 
 interface Props {
   fichierGrille: FichierGrille | null;
@@ -80,6 +81,9 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
   const [recherche, setRecherche] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [eleveSelectionne, setEleveSelectionne] = useState<DonneeEleve | null>(null);
+  // Vue onglets élèves
+  const [vueSuivi, setVueSuivi] = useState(false); // false = vue classe, true = vue suivi élève
+  const [ongletEleve, setOngletEleve] = useState<string | null>(null); // "NOM Prénom"
   const rechercheRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -387,20 +391,103 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
           )}
         </div>
 
-        {/* Sélecteur de classe */}
-        <div className="flex rounded-lg overflow-hidden border flex-shrink-0" style={{ borderColor: "#E7E5E4" }}>
-          {fichierGrille.classes.map((c) => (
-            <button key={c.nom} onClick={() => { setClasseActive(c.nom); setRecherche(""); setEleveSelectionne(null); }}
-              className="px-3 py-1.5 text-sm font-semibold transition-all"
-              style={{ background: classeActive === c.nom ? "#2563EB" : "white", color: classeActive === c.nom ? "white" : "#57534E" }}>
-              {c.nom}
+        {/* Sélecteur de classe + toggle vue */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "#E7E5E4" }}>
+            {fichierGrille.classes.map((c) => (
+              <button key={c.nom} onClick={() => { setClasseActive(c.nom); setRecherche(""); setEleveSelectionne(null); setOngletEleve(null); }}
+                className="px-3 py-1.5 text-sm font-semibold transition-all"
+                style={{ background: classeActive === c.nom ? "#2563EB" : "white", color: classeActive === c.nom ? "white" : "#57534E" }}>
+                {c.nom}
+              </button>
+            ))}
+          </div>
+          {/* Toggle vue classe / vue suivi */}
+          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "#E7E5E4" }}>
+            <button
+              onClick={() => setVueSuivi(false)}
+              className="px-3 py-1.5 text-xs font-semibold transition-all"
+              style={{ background: !vueSuivi ? "#1C1917" : "white", color: !vueSuivi ? "white" : "#57534E" }}
+              title="Vue classe"
+            >
+              Classe
             </button>
-          ))}
+            <button
+              onClick={() => { setVueSuivi(true); if (!ongletEleve && donneesEleves.length > 0) setOngletEleve(`${donneesEleves[0].nom} ${donneesEleves[0].prenom}`); }}
+              className="px-3 py-1.5 text-xs font-semibold transition-all"
+              style={{ background: vueSuivi ? "#1C1917" : "white", color: vueSuivi ? "white" : "#57534E" }}
+              title="Suivi par élève"
+            >
+              Suivi élève
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-5">
 
+        {/* ===== VUE SUIVI PAR ÉLÈVE ===== */}
+        {vueSuivi && (
+          <div className="rounded-xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid #E7E5E4" }}>
+            {/* Onglets élèves */}
+            <div className="border-b overflow-x-auto" style={{ borderColor: "#E7E5E4" }}>
+              <div className="flex" style={{ minWidth: "max-content" }}>
+                {donneesEleves.map((eleve) => {
+                  const key = `${eleve.nom} ${eleve.prenom}`;
+                  const isActive = ongletEleve === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setOngletEleve(key)}
+                      className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 flex-shrink-0"
+                      style={{
+                        borderBottomColor: isActive ? "#2563EB" : "transparent",
+                        background: isActive ? "#EFF6FF" : "transparent",
+                        color: isActive ? "#2563EB" : "#57534E",
+                      }}
+                    >
+                      <span className="font-bold">{eleve.nom}</span>{" "}{eleve.prenom}
+                      {eleve.noteGlobale !== null && (
+                        <span
+                          className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                          style={{
+                            background: noteGradientColor(eleve.noteGlobale).bg,
+                            color: noteGradientColor(eleve.noteGlobale).text,
+                          }}
+                        >
+                          {eleve.noteGlobale.toFixed(1)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Tableau de suivi de l'élève sélectionné */}
+            {(() => {
+              if (!ongletEleve) return (
+                <p className="text-center py-8 text-stone-400 text-sm">Sélectionnez un élève dans les onglets ci-dessus.</p>
+              );
+              const [nomEleve, ...prenomParts] = ongletEleve.split(" ");
+              const prenomEleve = prenomParts.join(" ");
+              const eleve = donneesEleves.find((e) => e.nom === nomEleve && e.prenom === prenomEleve);
+              if (!eleve) return null;
+              return (
+                <TableauSuiviEleve
+                  nom={eleve.nom}
+                  prenom={eleve.prenom}
+                  classe={eleve.classe}
+                  evaluations={eleve.toutesEvaluations}
+                />
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ===== VUE CLASSE (masquée en mode suivi) ===== */}
+        {!vueSuivi && (
+        <>
         {/* ── Fiche élève (si sélectionné via recherche) ── */}
         {eleveSelectionne && (
           <div className="rounded-xl bg-white shadow-sm overflow-hidden" style={{ border: "2px solid #2563EB" }}>
@@ -1076,6 +1163,8 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
               })}
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

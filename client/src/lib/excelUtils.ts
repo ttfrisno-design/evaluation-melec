@@ -21,7 +21,7 @@
  */
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import { calculerNotesEpreuves, calculerMoyenneBac, EPREUVES_BAC } from "./epreuvesBac";
+import { calculerNotesEpreuves, calculerMoyenneBac } from "./epreuvesBac";
 
 // ─────────────────────────────────────────────────────────────
 //  TYPES
@@ -206,10 +206,11 @@ function _mettreAJourOngletClasse(
   wb: XLSX.WorkBook,
   entree: EntreeEvaluation
 ): XLSX.WorkBook {
-  const { classe, nom, prenom, noteGlobale, date } = entree;
+  const { classe, nom, prenom, noteGlobale, date, equipement } = entree;
 
   let rows: (string | number | null)[][] = [];
 
+  // Lire l'onglet classe existant
   if (wb.Sheets[classe]) {
     rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[classe], {
       header: 1,
@@ -217,65 +218,67 @@ function _mettreAJourOngletClasse(
     }) as (string | number | null)[][];
   }
 
-  // En-tête
+  // En-tête avec date et équipement
   if (rows.length === 0) {
-    rows.push(["Nom", "Prénom", "Note /20"]);
+    rows.push(["Nom", "Prénom", "Dernière date", "Dernier équipement", "Note /20"]);
   } else {
-    // Normaliser l'en-tête
-    rows[0] = ["Nom", "Prénom", "Note /20"];
+    rows[0] = ["Nom", "Prénom", "Dernière date", "Dernier équipement", "Note /20"];
   }
 
-  // Chercher si l'élève existe déjà dans le tableau
-  const nomComplet = `${nom} ${prenom}`.toUpperCase();
+  // Chercher si l'élève existe déjà
   let ligneEleve = -1;
   for (let i = 1; i < rows.length; i++) {
     const a = String(rows[i][0] || "").toUpperCase().trim();
     const b = String(rows[i][1] || "").toUpperCase().trim();
-    if (
-      a === nom.toUpperCase() && b === prenom.toUpperCase() ||
-      a === nomComplet
-    ) {
+    if (a === nom.toUpperCase() && b === prenom.toUpperCase()) {
       ligneEleve = i;
       break;
     }
   }
 
   const noteVal = noteGlobale !== null ? noteGlobale : "";
+  const ligne: (string | number | null)[] = [
+    nom,
+    prenom,
+    date,
+    equipement || "",
+    noteVal,
+  ];
 
   if (ligneEleve >= 0) {
-    // Mettre à jour la note de l'élève existant
-    rows[ligneEleve][0] = nom;
-    rows[ligneEleve][1] = prenom;
-    rows[ligneEleve][2] = noteVal;
+    rows[ligneEleve] = ligne;
   } else {
-    // Ajouter l'élève
-    rows.push([nom, prenom, noteVal]);
+    rows.push(ligne);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }];
+  ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 10 }];
 
   wb.Sheets[classe] = ws;
   if (!wb.SheetNames.includes(classe)) {
-    wb.SheetNames.unshift(classe); // classes en premier
+    wb.SheetNames.unshift(classe);
   }
 
   return wb;
 }
 
 /**
- * Onglet élève (ex: "DUPONT Jean") :
- *  Structure par bloc (16 lignes) :
- *   L1 : "Évaluation" | "Détail"
- *   L2 : "Date"       | date
- *   L3 : "C1"         | note /20
- *   ...
- *   L15: "C13"        | note /20
- *   L16: "Note /20"   | noteGlobale
- *   (ligne vide séparateur entre blocs)
+ * Onglet élève (ex: "DUPONT Jean") — Format TABLEAU :
  *
- * Si l'onglet existe déjà, ajouter un nouveau bloc à la suite.
- * Si l'onglet n'existe pas, le créer.
+ *  Ligne 1 : "Compétence" | "Éval 1" | "Éval 2" | ...
+ *  Ligne 2 : "Date"       | date1    | date2    | ...
+ *  Ligne 3 : "Équipement" | equip1   | equip2   | ...
+ *  Ligne 4 : "Commentaire"| com1     | com2     | ...
+ *  Ligne 5 : "C1"         | note1    | note2    | ...
+ *  ...
+ *  Ligne 17: "C13"        | note1    | note2    | ...
+ *  Ligne 18: "Note /20"   | glob1    | glob2    | ...
+ *  Ligne 19: "E2 /20"     | e2_1     | e2_2     | ...
+ *  Ligne 20: "E31 /20"    | e31_1    | e31_2    | ...
+ *  Ligne 21: "E32 /20"    | e32_1    | e32_2    | ...
+ *  Ligne 22: "Moy. Bac"   | bac1     | bac2     | ...
+ *
+ * Chaque nouvelle évaluation ajoute une colonne à droite.
  */
 function _mettreAJourOngletEleve(
   wb: XLSX.WorkBook,
@@ -284,6 +287,28 @@ function _mettreAJourOngletEleve(
   const { nom, prenom, date, equipement, notesParCompetence, noteGlobale } = entree;
   const nomOnglet = nomOngletEleve(nom, prenom);
 
+  // Calculer les notes E2/E31/E32 pour cette évaluation
+  const epreuves = calculerNotesEpreuves(notesParCompetence);
+  const moyBac = calculerMoyenneBac(epreuves);
+  const noteE2  = epreuves.find((r) => r.id === "E2")?.note ?? null;
+  const noteE31 = epreuves.find((r) => r.id === "E31")?.note ?? null;
+  const noteE32 = epreuves.find((r) => r.id === "E32")?.note ?? null;
+
+  // Définition des lignes fixes (index 0-based)
+  const LIGNES_LABELS = [
+    "Compétence",   // 0 : en-tête
+    "Date",          // 1
+    "Équipement",   // 2
+    "Commentaire",   // 3
+    ...CODES_COMPETENCES, // 4..16 (C1..C13)
+    "Note /20",      // 17
+    "E2 /20",        // 18
+    "E31 /20",       // 19
+    "E32 /20",       // 20
+    "Moy. Bac",      // 21
+  ];
+
+  // Lire le tableau existant ou initialiser
   let rows: (string | number | null)[][] = [];
 
   if (wb.Sheets[nomOnglet]) {
@@ -293,30 +318,49 @@ function _mettreAJourOngletEleve(
     }) as (string | number | null)[][];
   }
 
-  // Si l'onglet est vide ou nouveau, initialiser l'en-tête
-  if (rows.length === 0) {
-    rows.push(["Évaluation", "Détail"]);
-    rows.push([]); // ligne vide
+  // Initialiser le tableau si vide
+  if (rows.length === 0 || String(rows[0]?.[0] || "").trim() !== "Compétence") {
+    rows = LIGNES_LABELS.map((label) => [label]);
   }
 
-  // Construire le nouveau bloc
-  const bloc: (string | number | null)[][] = [];
-  bloc.push(["Date", date]);
-  if (equipement) bloc.push(["Équipement", equipement]);
-  if (entree.commentaire?.trim()) bloc.push(["Commentaire", entree.commentaire.trim()]);
-
-  for (const code of CODES_COMPETENCES) {
-    const note = notesParCompetence[code];
-    bloc.push([code, note !== null && note !== undefined ? note : ""]);
+  // S'assurer que toutes les lignes existent
+  while (rows.length < LIGNES_LABELS.length) {
+    rows.push([LIGNES_LABELS[rows.length]]);
   }
 
-  bloc.push(["Note /20", noteGlobale !== null ? noteGlobale : ""]);
-  bloc.push([]); // ligne vide séparateur
+  // Numéro de la nouvelle évaluation = nb de colonnes existantes (col 0 = labels)
+  const numEval = (rows[0]?.length ?? 1); // col 0 = labels, col 1 = éval 1, etc.
+  const evalLabel = `Éval ${numEval}`;
 
-  rows.push(...bloc);
+  // Construire les valeurs de la nouvelle colonne
+  const valeurs: (string | number | null)[] = [
+    evalLabel,                                    // 0 : en-tête
+    date,                                          // 1 : date
+    equipement || "",                              // 2 : équipement
+    entree.commentaire?.trim() || "",              // 3 : commentaire
+    ...CODES_COMPETENCES.map((code) => {           // 4..16 : C1..C13
+      const note = notesParCompetence[code];
+      return note !== null && note !== undefined ? note : "";
+    }),
+    noteGlobale !== null ? noteGlobale : "",        // 17 : Note /20
+    noteE2  !== null ? noteE2  : "",               // 18 : E2
+    noteE31 !== null ? noteE31 : "",               // 19 : E31
+    noteE32 !== null ? noteE32 : "",               // 20 : E32
+    moyBac  !== null ? moyBac  : "",               // 21 : Moy. Bac
+  ];
+
+  // Ajouter la colonne à chaque ligne
+  for (let i = 0; i < LIGNES_LABELS.length; i++) {
+    if (!rows[i]) rows[i] = [LIGNES_LABELS[i]];
+    rows[i].push(valeurs[i] ?? "");
+  }
+
+  // Largeurs de colonnes
+  const cols: XLSX.ColInfo[] = [{ wch: 14 }]; // col labels
+  for (let c = 1; c <= numEval; c++) cols.push({ wch: 12 });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 16 }, { wch: 12 }];
+  ws["!cols"] = cols;
 
   wb.Sheets[nomOnglet] = ws;
   if (!wb.SheetNames.includes(nomOnglet)) {
@@ -444,6 +488,68 @@ export function lireEvaluationsEleve(
     defval: null,
   }) as (string | number | null)[][];
 
+  if (rows.length === 0) return [];
+
+  // Détecter le format :
+  // Nouveau format tableau : row[0][0] === "Compétence"
+  // Ancien format blocs : row[0][0] === "Évaluation" ou row[0][0] === "Date"
+  const premierLabel = String(rows[0]?.[0] || "").trim();
+
+  if (premierLabel === "Compétence") {
+    // ===== NOUVEAU FORMAT TABLEAU =====
+    // Ligne 0 : "Compétence" | "Éval 1" | "Éval 2" | ...
+    // Ligne 1 : "Date"       | date1    | date2    | ...
+    // Ligne 2 : "Équipement" | equip1   | equip2   | ...
+    // Ligne 3 : "Commentaire"| com1     | com2     | ...
+    // Ligne 4+ : C1..C13, Note /20, E2 /20, E31 /20, E32 /20, Moy. Bac
+
+    const nbCols = rows[0]?.length ?? 1;
+    const nbEvals = nbCols - 1; // col 0 = labels
+
+    // Construire un index label -> index de ligne
+    const rowIndex: Record<string, number> = {};
+    rows.forEach((row, i) => {
+      const lbl = String(row[0] || "").trim();
+      if (lbl) rowIndex[lbl] = i;
+    });
+
+    const blocs: BlocEvaluation[] = [];
+
+    for (let col = 1; col <= nbEvals; col++) {
+      const getVal = (label: string): string | number | null => {
+        const ri = rowIndex[label];
+        if (ri === undefined) return null;
+        const v = rows[ri]?.[col];
+        return v !== undefined ? v : null;
+      };
+
+      const dateVal = String(getVal("Date") || "");
+      if (!dateVal) continue;
+
+      const equipement = String(getVal("Équipement") || "");
+      const commentaire = String(getVal("Commentaire") || "");
+      const noteGlobaleRaw = getVal("Note /20");
+      const noteGlobale = noteGlobaleRaw !== null && noteGlobaleRaw !== "" ? Number(noteGlobaleRaw) : null;
+
+      const notes: Record<string, number | null> = {};
+      for (const code of CODES_COMPETENCES) {
+        const v = getVal(code);
+        notes[code] = v !== null && v !== "" ? Number(v) : null;
+      }
+
+      blocs.push({
+        date: dateVal,
+        equipement,
+        notes,
+        noteGlobale,
+        commentaire: commentaire || undefined,
+      });
+    }
+
+    return blocs;
+  }
+
+  // ===== ANCIEN FORMAT BLOCS (compatibilité ascendante) =====
   const blocs: BlocEvaluation[] = [];
   let i = 0;
 
@@ -468,7 +574,6 @@ export function lireEvaluationsEleve(
         if (lbl.toLowerCase() === "équipement") {
           equipement = String(val || "");
         } else if (lbl.toLowerCase() === "commentaire") {
-          // lire le commentaire pour l'afficher dans le tableau de bord
           if (val !== null && val !== "") commentaireBloc = String(val);
         } else if (lbl.toLowerCase() === "note /20") {
           noteGlobale = val !== null && val !== "" ? Number(val) : null;

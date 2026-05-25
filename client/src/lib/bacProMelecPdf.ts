@@ -247,6 +247,9 @@ export async function genererPdfBacEleve(
 /**
  * Génère et télécharge les PDF pour toute une classe
  */
+/**
+ * Génère et télécharge les PDF pour toute une classe
+ */
 export async function genererPdfsBacClasse(
   grille: FichierGrille,
   classe: string,
@@ -254,6 +257,7 @@ export async function genererPdfsBacClasse(
   numeroCandidats: Record<string, string>
 ): Promise<void> {
   const { saveAs } = await import("file-saver");
+  const { workbookToStyledPdf } = await import("./excelToStyledPdf");
   
   // Récupérer les élèves de la classe
   const classeData = grille.classes.find((c) => c.nom === classe);
@@ -278,39 +282,19 @@ export async function genererPdfsBacClasse(
     // Remplir le template
     const wb = await remplirTemplateExcelBac(templatePath, donnees);
     
-    // Convertir en HTML et générer PDF pour chaque onglet (E2, E31, E32)
+    // Générer PDF pour chaque onglet (E2, E31, E32)
     for (const sheetName of ["E2", "E31", "E32"]) {
       if (!wb.Sheets[sheetName]) continue;
       
-      const html = workbookToHtml(wb, sheetName);
+      // Générer le PDF stylisé
+      const pdf = await workbookToStyledPdf(
+        wb,
+        sheetName,
+        `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`
+      );
       
-      // Créer un élément DOM temporaire
-      const element = document.createElement("div");
-      element.innerHTML = html;
-      element.style.display = "none";
-      document.body.appendChild(element);
-      
-      try {
-        // Générer le PDF avec html2pdf
-        const html2pdf = (await import("html2pdf.js")).default;
-        
-        const pdf = await html2pdf()
-          .set({
-            margin: 5,
-            filename: `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`,
-            image: { type: "jpeg", quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
-          })
-          .from(element)
-          .toPdf()
-          .output("blob");
-        
-        // Télécharger le PDF
-        saveAs(pdf, `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`);
-      } finally {
-        document.body.removeChild(element);
-      }
+      // Télécharger le PDF
+      saveAs(pdf, `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`);
       
       // Petit délai pour éviter les problèmes
       await new Promise((resolve) => setTimeout(resolve, 500));

@@ -82,8 +82,18 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [eleveSelectionne, setEleveSelectionne] = useState<DonneeEleve | null>(null);
   // Vue onglets élèves
-  const [vueSuivi, setVueSuivi] = useState(false); // false = vue classe, true = vue suivi élève
-  const [ongletEleve, setOngletEleve] = useState<string | null>(null); // "NOM Prénom"
+  const [vueSuivi, setVueSuivi] = useState(false);
+  const [ongletEleve, setOngletEleve] = useState<string | null>(null);
+  // Sélection des séries du graphique d'évolution
+  const TOUTES_SERIES = [
+    ...COMPETENCES.map((c) => ({ id: c.code, label: c.code, couleur: c.couleur, groupe: "comp" as const })),
+    { id: "E2",     label: "E2",      couleur: "#2563EB", groupe: "exam" as const },
+    { id: "E31",    label: "E31",     couleur: "#7C3AED", groupe: "exam" as const },
+    { id: "E32",    label: "E32",     couleur: "#BE185D", groupe: "exam" as const },
+    { id: "global", label: "Globale", couleur: "#d97706", groupe: "exam" as const },
+  ];
+  const [seriesActives, setSeriesActives] = useState<string[]>(["E2", "E31", "E32", "global"]);
+  const [showSeriesFilter, setShowSeriesFilter] = useState(false);
   const rechercheRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -577,32 +587,31 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                 </div>
               )}
 
-              {/* Graphique d'évolution E2 / E31 / E32 */}
+              {/* Graphique d'évolution multi-séries avec sélection */}
               {eleveSelectionne.toutesEvaluations.length >= 1 && (() => {
                 const evals = eleveSelectionne.toutesEvaluations;
-                // Calculer E2/E31/E32 pour chaque évaluation
-                const series = evals.map((ev, i) => ({
+                const evalPoints = evals.map((ev, i) => ({
                   label: ev.date || `Éval ${i + 1}`,
                   resultats: calculerNotesEpreuves(ev.notes),
                   noteGlobale: ev.noteGlobale,
+                  notes: ev.notes,
                 }));
 
-                const W = 480, H = 140, PAD_L = 32, PAD_R = 16, PAD_T = 12, PAD_B = 28;
+                const W = 520, H = 160, PAD_L = 32, PAD_R = 16, PAD_T = 14, PAD_B = 28;
                 const chartW = W - PAD_L - PAD_R;
                 const chartH = H - PAD_T - PAD_B;
-                const n = series.length;
+                const n = evalPoints.length;
                 const xStep = n > 1 ? chartW / (n - 1) : chartW / 2;
-
                 const toY = (val: number | null) =>
                   val === null ? null : PAD_T + chartH - (val / 20) * chartH;
 
-                const couleurs: Record<string, string> = { E2: "#2563EB", E31: "#7C3AED", E32: "#BE185D", global: "#d97706" };
-                const series_lines = [
-                  { id: "E2",     label: "E2",      vals: series.map((s) => s.resultats.find((r) => r.id === "E2")?.note ?? null) },
-                  { id: "E31",    label: "E31",     vals: series.map((s) => s.resultats.find((r) => r.id === "E31")?.note ?? null) },
-                  { id: "E32",    label: "E32",     vals: series.map((s) => s.resultats.find((r) => r.id === "E32")?.note ?? null) },
-                  { id: "global", label: "Globale", vals: series.map((s) => s.noteGlobale) },
-                ];
+                // Récupérer la valeur d'une série pour un point
+                const getVal = (serieId: string, pt: typeof evalPoints[0]): number | null => {
+                  if (serieId === "global") return pt.noteGlobale;
+                  if (["E2","E31","E32"].includes(serieId))
+                    return pt.resultats.find((r) => r.id === serieId)?.note ?? null;
+                  return pt.notes[serieId] ?? null;
+                };
 
                 const buildPath = (vals: (number | null)[]) => {
                   const pts = vals.map((v, i) => ({ x: PAD_L + i * xStep, y: toY(v) })).filter((p) => p.y !== null);
@@ -610,72 +619,148 @@ export default function Dashboard({ fichierGrille, onRetour }: Props) {
                   return pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${(p.y as number).toFixed(1)}`).join(" ");
                 };
 
+                const seriesVisibles = TOUTES_SERIES.filter((s) => seriesActives.includes(s.id));
                 const gridLines = [0, 5, 10, 15, 20];
 
                 return (
                   <div className="mb-4">
-                    <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Progression E2 / E31 / E32</p>
-                    <div className="rounded-xl p-3" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
-                      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
-                        {/* Grille horizontale */}
-                        {gridLines.map((v) => {
-                          const y = toY(v) as number;
-                          return (
-                            <g key={v}>
-                              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#E7E5E4" strokeWidth="0.5" strokeDasharray={v === 10 ? "4,2" : "2,2"} />
-                              <text x={PAD_L - 4} y={y + 3.5} textAnchor="end" fontSize="8" fill="#A8A29E">{v}</text>
-                            </g>
-                          );
-                        })}
-
-                        {/* Lignes verticales (une par évaluation) */}
-                        {series.map((_, i) => (
-                          <line key={i} x1={PAD_L + i * xStep} y1={PAD_T} x2={PAD_L + i * xStep} y2={PAD_T + chartH} stroke="#F5F5F4" strokeWidth="1" />
-                        ))}
-
-                        {/* Courbes */}
-                        {series_lines.map((line) => {
-                          const path = buildPath(line.vals);
-                          if (!path) return null;
-                          return (
-                            <g key={line.id}>
-                              <path d={path} fill="none" stroke={couleurs[line.id]} strokeWidth={line.id === "global" ? 1.5 : 2}
-                                strokeDasharray={line.id === "global" ? "4,2" : undefined} strokeLinecap="round" strokeLinejoin="round" />
-                              {/* Points */}
-                              {line.vals.map((v, i) => {
-                                if (v === null) return null;
-                                const cx = PAD_L + i * xStep;
-                                const cy = toY(v) as number;
-                                return (
-                                  <g key={i}>
-                                    <circle cx={cx} cy={cy} r={3.5} fill={couleurs[line.id]} stroke="white" strokeWidth={1.5} />
-                                    <text x={cx} y={cy - 6} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={couleurs[line.id]}>
-                                      {v.toFixed(1)}
-                                    </text>
-                                  </g>
-                                );
-                              })}
-                            </g>
-                          );
-                        })}
-
-                        {/* Labels axe X */}
-                        {series.map((s, i) => (
-                          <text key={i} x={PAD_L + i * xStep} y={H - 4} textAnchor="middle" fontSize="8" fill="#78716C">
-                            {s.label.length > 10 ? s.label.slice(5) : s.label}
-                          </text>
-                        ))}
-                      </svg>
-
-                      {/* Légende */}
-                      <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                        {series_lines.map((line) => (
-                          <div key={line.id} className="flex items-center gap-1.5">
-                            <div className="w-5 h-0.5 rounded" style={{ background: couleurs[line.id], borderTop: line.id === "global" ? `2px dashed ${couleurs[line.id]}` : undefined }} />
-                            <span className="text-xs font-semibold" style={{ color: couleurs[line.id] }}>{line.label}</span>
+                    {/* En-tête avec bouton de sélection */}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Courbes d'évolution</p>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowSeriesFilter((v) => !v)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+                          style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
+                        >
+                          Séries ({seriesActives.length}) {showSeriesFilter ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                        </button>
+                        {showSeriesFilter && (
+                          <div
+                            className="absolute right-0 top-full mt-1 z-30 rounded-xl shadow-xl p-3"
+                            style={{ background: "white", border: "1px solid #E7E5E4", width: "260px" }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-stone-500">Compétences</span>
+                              <div className="flex gap-2">
+                                <button onClick={() => setSeriesActives(TOUTES_SERIES.map(s=>s.id))} className="text-xs text-blue-600 hover:underline">Tout</button>
+                                <button onClick={() => setSeriesActives([])} className="text-xs text-stone-400 hover:underline">Aucun</button>
+                              </div>
+                            </div>
+                            {/* Compétences */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {TOUTES_SERIES.filter(s=>s.groupe==="comp").map((s) => (
+                                <button
+                                  key={s.id}
+                                  onClick={() => setSeriesActives((prev) =>
+                                    prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id]
+                                  )}
+                                  className="px-2 py-0.5 rounded text-xs font-bold transition-all"
+                                  style={{
+                                    background: seriesActives.includes(s.id) ? s.couleur : "#F5F5F4",
+                                    color: seriesActives.includes(s.id) ? "white" : "#A8A29E",
+                                  }}
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
+                            {/* Épreuves */}
+                            <div className="text-xs font-semibold text-stone-500 mb-1.5">Épreuves Bac</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {TOUTES_SERIES.filter(s=>s.groupe==="exam").map((s) => (
+                                <button
+                                  key={s.id}
+                                  onClick={() => setSeriesActives((prev) =>
+                                    prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id]
+                                  )}
+                                  className="px-2 py-0.5 rounded text-xs font-bold transition-all"
+                                  style={{
+                                    background: seriesActives.includes(s.id) ? s.couleur : "#F5F5F4",
+                                    color: seriesActives.includes(s.id) ? "white" : "#A8A29E",
+                                  }}
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        ))}
+                        )}
                       </div>
+                    </div>
+
+                    <div className="rounded-xl p-3" style={{ background: "#FAFAF9", border: "1px solid #E7E5E4" }}>
+                      {seriesVisibles.length === 0 ? (
+                        <p className="text-center py-4 text-stone-400 text-xs">Sélectionnez au moins une série à afficher.</p>
+                      ) : (
+                        <>
+                        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+                          {/* Grille */}
+                          {gridLines.map((v) => {
+                            const y = toY(v) as number;
+                            return (
+                              <g key={v}>
+                                <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#E7E5E4" strokeWidth="0.5" strokeDasharray={v === 10 ? "4,2" : "2,2"} />
+                                <text x={PAD_L - 4} y={y + 3.5} textAnchor="end" fontSize="8" fill="#A8A29E">{v}</text>
+                              </g>
+                            );
+                          })}
+                          {/* Lignes verticales */}
+                          {evalPoints.map((_, i) => (
+                            <line key={i} x1={PAD_L + i * xStep} y1={PAD_T} x2={PAD_L + i * xStep} y2={PAD_T + chartH} stroke="#F5F5F4" strokeWidth="1" />
+                          ))}
+                          {/* Courbes */}
+                          {seriesVisibles.map((serie) => {
+                            const vals = evalPoints.map((pt) => getVal(serie.id, pt));
+                            const path = buildPath(vals);
+                            const isDash = serie.id === "global";
+                            return (
+                              <g key={serie.id}>
+                                {path && (
+                                  <path d={path} fill="none" stroke={serie.couleur} strokeWidth={2}
+                                    strokeDasharray={isDash ? "4,2" : undefined}
+                                    strokeLinecap="round" strokeLinejoin="round" />
+                                )}
+                                {vals.map((v, i) => {
+                                  if (v === null) return null;
+                                  const cx = PAD_L + i * xStep;
+                                  const cy = toY(v) as number;
+                                  return (
+                                    <g key={i}>
+                                      <circle cx={cx} cy={cy} r={3} fill={serie.couleur} stroke="white" strokeWidth={1.5} />
+                                      <text x={cx} y={cy - 5} textAnchor="middle" fontSize="7" fontWeight="700" fill={serie.couleur}>
+                                        {v.toFixed(1)}
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+                              </g>
+                            );
+                          })}
+                          {/* Labels axe X */}
+                          {evalPoints.map((pt, i) => (
+                            <text key={i} x={PAD_L + i * xStep} y={H - 4} textAnchor="middle" fontSize="8" fill="#78716C">
+                              {pt.label.length > 10 ? pt.label.slice(5) : pt.label}
+                            </text>
+                          ))}
+                        </svg>
+                        {/* Légende */}
+                        <div className="flex flex-wrap gap-2 mt-2 justify-center">
+                          {seriesVisibles.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => setSeriesActives((prev) => prev.filter((x) => x !== s.id))}
+                              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold transition-all"
+                              style={{ background: `${s.couleur}15`, color: s.couleur, border: `1px solid ${s.couleur}30` }}
+                              title="Cliquer pour masquer"
+                            >
+                              <div className="w-4 h-0.5" style={{ background: s.couleur }} />
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );

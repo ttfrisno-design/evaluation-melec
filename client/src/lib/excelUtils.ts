@@ -169,18 +169,32 @@ function nomOngletEleve(nom: string, prenom: string): string {
 }
 
 /**
+ * Clone profond d'un workbook XLSX pour éviter les mutations React.
+ * Passe par une sérialisation/désérialisation binaire.
+ */
+function _clonerWorkbook(wb: XLSX.WorkBook): XLSX.WorkBook {
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  return XLSX.read(buf, { type: "array" });
+}
+
+/**
  * Enregistre une évaluation dans le workbook :
- *  1. Met à jour l'onglet classe : col A=Nom, col B=Prénom, col C=Note/20
- *  2. Met à jour l'onglet élève : blocs Date + C1..C13 + Note globale
+ *  1. Clone le workbook pour éviter les mutations d'état React
+ *  2. Met à jour l'onglet classe : col A=Nom, col B=Prénom, col C=Note/20
+ *  3. Met à jour l'onglet élève : blocs Date + C1..C13 + Note globale
+ *  4. Met à jour l'onglet Récap Bac
  */
 export function enregistrerEvaluation(
   wb: XLSX.WorkBook,
   entree: EntreeEvaluation
 ): XLSX.WorkBook {
-  wb = _mettreAJourOngletClasse(wb, entree);
-  wb = _mettreAJourOngletEleve(wb, entree);
-  wb = _mettreAJourOngletEpreuves(wb, entree);
-  return wb;
+  // Cloner pour garantir que le workbook modifié est un nouvel objet
+  // et ne mute pas l'état React existant
+  let wbClone = _clonerWorkbook(wb);
+  wbClone = _mettreAJourOngletClasse(wbClone, entree);
+  wbClone = _mettreAJourOngletEleve(wbClone, entree);
+  wbClone = _mettreAJourOngletEpreuves(wbClone, entree);
+  return wbClone;
 }
 
 /**
@@ -525,6 +539,7 @@ export function ajouterEleve(
 ): { wb: XLSX.WorkBook; succes: boolean; message: string } {
   const nomNorm = nom.trim().toUpperCase();
   const prenomNorm = prenom.trim();
+  wb = _clonerWorkbook(wb);
 
   if (!nomNorm) {
     return { wb, succes: false, message: "Le nom est obligatoire." };
@@ -588,6 +603,7 @@ export function supprimerEleve(
 ): { wb: XLSX.WorkBook; succes: boolean; message: string } {
   const nomNorm = nom.trim().toUpperCase();
   const prenomNorm = prenom.trim();
+  wb = _clonerWorkbook(wb);
 
   // Supprimer de l'onglet classe
   if (wb.Sheets[classe]) {
@@ -632,6 +648,7 @@ export function ajouterClasse(
   nomClasse: string
 ): { wb: XLSX.WorkBook; succes: boolean; message: string } {
   const nom = nomClasse.trim();
+  wb = _clonerWorkbook(wb);
   if (!nom) return { wb, succes: false, message: "Le nom de la classe est obligatoire." };
   if (wb.SheetNames.includes(nom)) {
     return { wb, succes: false, message: `La classe "${nom}" existe déjà.` };
@@ -659,6 +676,7 @@ export function supprimerClasse(
   wb: XLSX.WorkBook,
   nomClasse: string
 ): { wb: XLSX.WorkBook; succes: boolean; message: string } {
+  wb = _clonerWorkbook(wb);
   if (!wb.SheetNames.includes(nomClasse)) {
     return { wb, succes: false, message: `La classe "${nomClasse}" n'existe pas.` };
   }

@@ -269,7 +269,8 @@ export async function genererPdfsBacClasse(
   for (let i = 0; i < classeData.eleves.length; i++) {
     const eleve = classeData.eleves[i];
     const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
-    const numeroCandidat = numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
+    // Utiliser le numéro de candidat de l'élève, sinon celui saisi, sinon générer un par défaut
+    const numeroCandidat = eleve.numeroCandidat || numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
     
     const donnees = extraireDonneesBacElevePdf(
       grille,

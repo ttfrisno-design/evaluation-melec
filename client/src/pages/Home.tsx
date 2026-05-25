@@ -1525,15 +1525,20 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 .find((c) => c.nom === classeSelectionnee)
                 ?.eleves.map((eleve) => {
                   const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
+                  // Utiliser le numéro pré-inscrit de l'élève ou celui saisi
+                  const numeroAffiche = numeroCandidats[key] || eleve.numeroCandidat || "";
                   return (
                     <div key={key} className="flex items-center gap-3">
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-stone-900">{eleve.prenom} {eleve.nom}</p>
+                        {eleve.numeroCandidat && !numeroCandidats[key] && (
+                          <p className="text-xs text-stone-500 mt-0.5">Pré-inscrit: {eleve.numeroCandidat}</p>
+                        )}
                       </div>
                       <input
                         type="text"
                         placeholder="Ex: A2026 0001 0001"
-                        value={numeroCandidats[key] || ""}
+                        value={numeroAffiche}
                         onChange={(e) => {
                           setNumeroCandidats({
                             ...numeroCandidats,

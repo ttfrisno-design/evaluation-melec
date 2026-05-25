@@ -32,6 +32,7 @@ export interface EleveInfo {
   prenom: string;
   classe: string;
   colIndex: number; // conservé pour compatibilité
+  numeroCandidat?: string; // numéro de candidat (optionnel)
 }
 
 export interface ClasseData {
@@ -139,7 +140,9 @@ export async function lireFichierGrille(file: File): Promise<FichierGrille> {
             }
 
             if (nom) {
-              eleves.push({ nom, prenom, classe: sheetName, colIndex: i - 1 });
+              // Lire le numéro de candidat en colonne C
+              const numeroCandidat = row[2] ? String(row[2]).trim() : undefined;
+              eleves.push({ nom, prenom, classe: sheetName, colIndex: i - 1, numeroCandidat });
             }
           }
 

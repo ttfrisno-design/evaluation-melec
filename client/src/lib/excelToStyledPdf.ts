@@ -1,6 +1,6 @@
 /**
  * Utilitaires pour convertir un fichier Excel en PDF avec styles préservés
- * Extrait les couleurs, bordures, alignement et autres styles du fichier Excel
+ * Utilise jsPDF directement pour éviter les problèmes avec html2pdf et les styles Tailwind
  */
 import * as XLSX from "xlsx";
 
@@ -39,10 +39,6 @@ function hexToRgb(hex: string): string {
 function extractCellStyle(cell: any): CellStyle {
   const style: CellStyle = {};
   
-  // Note: xlsx (community) ne charge pas les styles par défaut
-  // Cette fonction retourne un objet vide pour la plupart des cas
-  // Les styles sont appliqués via les couleurs RGB directes
-  
   try {
     if (!cell) return style;
     
@@ -64,81 +60,70 @@ function extractCellStyle(cell: any): CellStyle {
       }
     }
   } catch (e) {
-    // Ignorer silencieusement les erreurs de conversion
+    // Ignorer silencieusement les erreurs
   }
   
   return style;
 }
 
 /**
- * Génère un HTML stylé à partir d'un workbook Excel
- * Utilise uniquement des styles inline sans classes CSS pour éviter les problèmes avec html2pdf
+ * Génère un PDF stylisé à partir d'un workbook Excel en utilisant jsPDF directement
  */
-export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Paramètres"): string {
+export async function workbookToStyledPdf(
+  wb: XLSX.WorkBook,
+  sheetName: string,
+  filename: string
+): Promise<Blob> {
+  const { jsPDF } = await import("jspdf");
+  
   const ws = wb.Sheets[sheetName];
-  if (!ws) return "";
+  if (!ws) {
+    throw new Error(`Feuille "${sheetName}" non trouvée`);
+  }
+  
+  // Créer un document PDF
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
   
   // Obtenir les dimensions de la feuille
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   
-  let html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      font-family: Calibri, Arial, sans-serif;
-      font-size: 11pt;
-      line-height: 1.2;
-      padding: 20px;
-      background: white;
-    }
-    
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      table-layout: fixed;
-    }
-    
-    td {
-      border: 1px solid #999999;
-      padding: 4px 6px;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      white-space: normal;
-      min-height: 20px;
-    }
-  </style>
-</head>
-<body>
-  <table>
-`;
-  
   // Couleurs prédéfinies du template Excel
-  const colorMap: Record<string, string> = {
-    "FFBDD6EE": "rgb(189, 214, 238)",  // Gris clair
-    "FF9CC2E5": "rgb(156, 194, 229)",  // Gris moyen
-    "FFDEEAF6": "rgb(222, 234, 246)",  // Gris foncé
-    "FFC5E0B3": "rgb(197, 224, 179)",  // Vert clair
-    "FFFFFF99": "rgb(255, 255, 153)",  // Jaune clair
+  const colorMap: Record<string, [number, number, number]> = {
+    "FFBDD6EE": [189, 214, 238],  // Gris clair
+    "FF9CC2E5": [156, 194, 229],  // Gris moyen
+    "FFDEEAF6": [222, 234, 246],  // Gris foncé
+    "FFC5E0B3": [197, 224, 179],  // Vert clair
+    "FFFFFF99": [255, 255, 153],  // Jaune clair
   };
+  
+  // Paramètres de mise en page
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  const contentWidth = pageWidth - 2 * margin;
+  
+  // Largeur de colonne moyenne
+  const cellWidth = contentWidth / (range.e.c - range.s.c + 1);
+  const cellHeight = 8;
+  
+  let yPos = margin;
   
   // Parcourir les lignes et colonnes
   for (let row = range.s.r; row <= range.e.r; row++) {
-    html += "<tr>";
+    let xPos = margin;
     
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
       const cell = ws[cellAddress];
       
       let cellValue = "";
-      let cellStyle = "";
+      let bgColor: [number, number, number] | null = null;
+      let textColor: [number, number, number] = [0, 0, 0];
+      let isBold = false;
       
       if (cell) {
         // Obtenir la valeur
@@ -146,105 +131,64 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
           cellValue = cell.v;
         } else if (typeof cell.v === "number") {
           cellValue = String(cell.v);
-        } else if (cell.f) {
-          // Afficher la formule ou une valeur par défaut
-          cellValue = cell.v ? String(cell.v) : "";
         }
         
-        // Extraire les styles
-        const style = extractCellStyle(cell);
-        
-        // Construire les styles inline
-        const styleProps: string[] = [];
-        
-        // Couleur de fond - utiliser la couleur RGB directe
+        // Couleur de fond
         if (cell.fill && cell.fill.start_color) {
           const color = cell.fill.start_color;
           if (typeof color.rgb === "string") {
             const rgb = color.rgb.toUpperCase();
             const mappedColor = colorMap[rgb];
             if (mappedColor) {
-              styleProps.push(`background-color: ${mappedColor}`);
-            } else if (rgb.startsWith("FF")) {
-              // Convertir directement si pas dans la map
-              try {
-                styleProps.push(`background-color: ${hexToRgb(rgb)}`);
-              } catch (e) {
-                // Ignorer
-              }
+              bgColor = mappedColor;
             }
           }
         }
         
-        // Alignement
-        if (cell.alignment) {
-          if (cell.alignment.horizontal) {
-            styleProps.push(`text-align: ${cell.alignment.horizontal}`);
-          }
-          if (cell.alignment.vertical) {
-            styleProps.push(`vertical-align: ${cell.alignment.vertical}`);
-          }
-        }
-        
         // Police
-        if (style.fontWeight) {
-          styleProps.push(`font-weight: ${style.fontWeight}`);
-        }
-        if (style.fontSize) {
-          styleProps.push(`font-size: ${style.fontSize}`);
-        }
-        if (style.color) {
-          styleProps.push(`color: ${style.color}`);
-        }
-        
-        if (styleProps.length > 0) {
-          cellStyle = `style="${styleProps.join("; ")}"`;
+        if (cell.font && cell.font.bold) {
+          isBold = true;
         }
       }
       
-      html += `<td ${cellStyle}>${cellValue}</td>`;
+      // Dessiner la cellule
+      // Fond
+      if (bgColor) {
+        pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+        pdf.rect(xPos, yPos, cellWidth, cellHeight, "F");
+      }
+      
+      // Bordure
+      pdf.setDrawColor(153, 153, 153);
+      pdf.rect(xPos, yPos, cellWidth, cellHeight);
+      
+      // Texte
+      pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+      if (isBold) {
+        pdf.setFont("Helvetica", "bold");
+      } else {
+        pdf.setFont("Helvetica", "normal");
+      }
+      pdf.setFontSize(10);
+      
+      // Afficher le texte avec wrapping
+      const textX = xPos + 1;
+      const textY = yPos + cellHeight / 2 + 1;
+      pdf.text(cellValue.substring(0, 20), textX, textY, { maxWidth: cellWidth - 2 });
+      
+      xPos += cellWidth;
     }
     
-    html += "</tr>";
+    yPos += cellHeight;
+    
+    // Ajouter une nouvelle page si nécessaire
+    if (yPos > pageHeight - margin) {
+      pdf.addPage();
+      yPos = margin;
+    }
   }
   
-  html += `
-  </table>
-</body>
-</html>
-`;
-  
-  return html;
-}
-
-/**
- * Génère un PDF stylisé à partir d'un workbook Excel
- */
-export async function workbookToStyledPdf(
-  wb: XLSX.WorkBook,
-  sheetName: string,
-  filename: string
-): Promise<Blob> {
-  const html2pdf = (await import("html2pdf.js")).default;
-  
-  // Générer le HTML
-  const htmlContent = workbookToStyledHtml(wb, sheetName);
-  
-  // Options pour html2pdf
-  const options = {
-    margin: 10,
-    filename: filename,
-    image: { type: "png" as const, quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: "portrait" as const, unit: "mm" as const, format: "a4" as const },
-  };
-  
-  return new Promise((resolve, reject) => {
-    html2pdf()
-      .set(options)
-      .from(htmlContent)
-      .outputPdf("blob")
-      .then((pdf: Blob) => resolve(pdf))
-      .catch((err: any) => reject(err));
-  });
+  // Convertir en Blob
+  const pdfBlob = pdf.output("blob");
+  return pdfBlob;
 }

@@ -90,9 +90,17 @@ export async function remplirTemplateExcelBac(
 ): Promise<XLSX.WorkBook> {
   // Charger le template
   const response = await fetch(templatePath);
+  if (!response.ok) {
+    throw new Error(`Impossible de charger le template: ${response.status} ${response.statusText}`);
+  }
   const arrayBuffer = await response.arrayBuffer();
   const data = new Uint8Array(arrayBuffer);
-  const wbTemplate = XLSX.read(data, { type: "array" });
+  let wbTemplate: XLSX.WorkBook;
+  try {
+    wbTemplate = XLSX.read(data, { type: "array" });
+  } catch (err) {
+    throw new Error(`Erreur lors de la lecture du template Excel: ${String(err)}`);
+  }
   
   // Cloner le workbook
   const wb = XLSX.utils.book_new();
@@ -267,38 +275,50 @@ export async function genererPdfsBacClasse(
   
   // Pour chaque élève, générer un PDF
   for (let i = 0; i < classeData.eleves.length; i++) {
-    const eleve = classeData.eleves[i];
-    const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
-    // Utiliser le numéro de candidat de l'élève, sinon celui saisi, sinon générer un par défaut
-    const numeroCandidat = eleve.numeroCandidat || numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
-    
-    const donnees = extraireDonneesBacElevePdf(
-      grille,
-      classe,
-      eleve.nom,
-      eleve.prenom,
-      numeroCandidat
-    );
-    
-    // Remplir le template
-    const wb = await remplirTemplateExcelBac(templatePath, donnees);
-    
-    // Générer PDF pour chaque onglet (E2, E31, E32)
-    for (const sheetName of ["E2", "E31", "E32"]) {
-      if (!wb.Sheets[sheetName]) continue;
+    try {
+      const eleve = classeData.eleves[i];
+      const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
+      // Utiliser le numéro de candidat de l'élève, sinon celui saisi, sinon générer un par défaut
+      const numeroCandidat = eleve.numeroCandidat || numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
       
-      // Générer le PDF stylisé
-      const pdf = await workbookToStyledPdf(
-        wb,
-        sheetName,
-        `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`
+      console.log(`Génération PDF pour ${eleve.prenom} ${eleve.nom} (${numeroCandidat})`);
+      
+      const donnees = extraireDonneesBacElevePdf(
+        grille,
+        classe,
+        eleve.nom,
+        eleve.prenom,
+        numeroCandidat
       );
       
-      // Télécharger le PDF
-      saveAs(pdf, `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`);
+      // Remplir le template
+      const wb = await remplirTemplateExcelBac(templatePath, donnees);
       
-      // Petit délai pour éviter les problèmes
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Générer PDF pour chaque onglet (E2, E31, E32)
+      for (const sheetName of ["E2", "E31", "E32"]) {
+        if (!wb.Sheets[sheetName]) {
+          console.warn(`Onglet ${sheetName} non trouvé pour ${eleve.prenom} ${eleve.nom}`);
+          continue;
+        }
+        
+        console.log(`  Génération PDF pour l'onglet ${sheetName}`);
+        
+        // Générer le PDF stylisé
+        const pdf = await workbookToStyledPdf(
+          wb,
+          sheetName,
+          `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`
+        );
+        
+        // Télécharger le PDF
+        saveAs(pdf, `Bac_${classe}_${eleve.nom}_${eleve.prenom}_${sheetName}.pdf`);
+        
+        // Petit délai pour éviter les problèmes
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    } catch (err) {
+      console.error(`Erreur lors de la génération pour l'élève ${i}:`, err);
+      throw err;
     }
   }
 }

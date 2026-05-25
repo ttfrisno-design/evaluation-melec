@@ -39,59 +39,32 @@ function hexToRgb(hex: string): string {
 function extractCellStyle(cell: any): CellStyle {
   const style: CellStyle = {};
   
-  // Couleur de fond
-  if (cell.fill && cell.fill.patternType === "solid" && cell.fill.start_color) {
-    try {
+  // Note: xlsx (community) ne charge pas les styles par défaut
+  // Cette fonction retourne un objet vide pour la plupart des cas
+  // Les styles sont appliqués via les classes CSS basées sur les couleurs RGB
+  
+  try {
+    if (!cell) return style;
+    
+    // Couleur de fond
+    if (cell.fill && typeof cell.fill === 'object' && cell.fill.patternType === "solid" && cell.fill.start_color) {
       const color = cell.fill.start_color;
       if (typeof color.rgb === "string") {
         style.backgroundColor = hexToRgb(color.rgb);
-      } else if (color.theme !== undefined) {
-        // Utiliser une couleur par défaut pour les couleurs de thème
-        style.backgroundColor = "#FFFFFF";
-      }
-    } catch (e) {
-      // Ignorer les erreurs de conversion
-    }
-  }
-  
-  // Bordures
-  if (cell.border) {
-    if (cell.border.left && cell.border.left.style) {
-      style.borderStyle = "solid";
-      style.borderColor = "#000000";
-    }
-  }
-  
-  // Police
-  if (cell.font) {
-    if (cell.font.bold) {
-      style.fontWeight = "bold";
-    }
-    if (cell.font.size) {
-      style.fontSize = `${cell.font.size}pt`;
-    }
-    if (cell.font.name) {
-      style.fontFamily = cell.font.name;
-    }
-    if (cell.font.color) {
-      try {
-        if (typeof cell.font.color.rgb === "string") {
-          style.color = hexToRgb(cell.font.color.rgb);
-        }
-      } catch (e) {
-        // Ignorer les erreurs
       }
     }
-  }
-  
-  // Alignement
-  if (cell.alignment) {
-    if (cell.alignment.horizontal) {
-      style.textAlign = cell.alignment.horizontal;
+    
+    // Police
+    if (cell.font && typeof cell.font === 'object') {
+      if (cell.font.bold) {
+        style.fontWeight = "bold";
+      }
+      if (cell.font.size && typeof cell.font.size === 'number') {
+        style.fontSize = `${cell.font.size}pt`;
+      }
     }
-    if (cell.alignment.vertical) {
-      style.verticalAlign = cell.alignment.vertical;
-    }
+  } catch (e) {
+    // Ignorer silencieusement les erreurs de conversion
   }
   
   return style;

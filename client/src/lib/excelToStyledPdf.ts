@@ -71,7 +71,44 @@ function extractCellStyle(cell: any): CellStyle {
 }
 
 /**
- * Génère un HTML stylisé à partir d'un workbook Excel
+ * Nettoie les styles CSS pour les rendre compatibles avec html2pdf
+ */
+function cleanCssForPdf(html: string): string {
+  // Remplacer les couleurs oklch par des couleurs rgb
+  // oklch(L% C H) -> rgb(r, g, b)
+  html = html.replace(/oklch\([^)]+\)/g, 'rgb(200, 200, 200)');
+  
+  // Remplacer les couleurs hsl par des couleurs rgb
+  // hsl(H, S%, L%) -> rgb(r, g, b)
+  html = html.replace(/hsl\(([^,]+),\s*([^,]+),\s*([^)]+)\)/g, (match, h, s, l) => {
+    const hue = parseFloat(h);
+    const sat = parseFloat(s) / 100;
+    const light = parseFloat(l) / 100;
+    
+    const c = (1 - Math.abs(2 * light - 1)) * sat;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = light - c / 2;
+    
+    let r = 0, g = 0, b = 0;
+    if (hue < 60) { r = c; g = x; b = 0; }
+    else if (hue < 120) { r = x; g = c; b = 0; }
+    else if (hue < 180) { r = 0; g = c; b = x; }
+    else if (hue < 240) { r = 0; g = x; b = c; }
+    else if (hue < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    
+    r = Math.round((r + m) * 255);
+    g = Math.round((g + m) * 255);
+    b = Math.round((b + m) * 255);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+  });
+  
+  return html;
+}
+
+/**
+ * Génère un HTML stylé à partir d'un workbook Excel
  */
 export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Paramètres"): string {
   const ws = wb.Sheets[sheetName];
@@ -255,6 +292,9 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
     </body>
     </html>
   `;
+  
+  // Nettoyer les styles CSS pour la compatibilité avec html2pdf
+  html = cleanCssForPdf(html);
   
   return html;
 }

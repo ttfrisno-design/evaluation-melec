@@ -64,6 +64,7 @@ import { exporterBulletinPDF } from "@/lib/pdfBulletin";
 import GestionEleves from "@/components/GestionEleves";
 import SavoirEtre from "@/components/SavoirEtre";
 import { CRITERES_SAVOIR_ETRE, couleurSavoirEtre } from "@/lib/savoirEtre";
+import { genererDocumentsBacClasse } from "@/lib/bacProMelecExport";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
@@ -126,6 +127,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showHistoEleve, setShowHistoEleve] = useState(false);
   const [showGestionEleves, setShowGestionEleves] = useState(false);
   const [showArchiver, setShowArchiver] = useState(false);
+  const [showDocBac, setShowDocBac] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // drawer mobile
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -738,13 +740,22 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             </button>
           )}
           {fichierGrille && classeSelectionnee && (
-            <button
-              onClick={() => setShowArchiver(true)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-              style={{ background: "#3C3836", color: "#FBBF24", border: "1px solid #78350F" }}
-            >
-              <Archive size={13} /> Archiver la classe
-            </button>
+            <>
+              <button
+                onClick={() => setShowDocBac(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{ background: "#3C3836", color: "#EC4899", border: "1px solid #BE185D" }}
+              >
+                <FileText size={13} /> Document Bac
+              </button>
+              <button
+                onClick={() => setShowArchiver(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{ background: "#3C3836", color: "#FBBF24", border: "1px solid #78350F" }}
+              >
+                <Archive size={13} /> Archiver la classe
+              </button>
+            </>
           )}
           <button
             onClick={() => {
@@ -1446,6 +1457,65 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 style={{ background: "#FBBF24", color: "#78350F", border: "1px solid #F59E0B" }}
               >
                 {isSaving ? "Archivage..." : "Archiver"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL DOCUMENT BAC ===== */}
+      {showDocBac && fichierGrille && classeSelectionnee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <h2 className="text-lg font-bold" style={{ color: "#BE185D" }}>Générer les documents Bac</h2>
+              <p className="text-sm text-stone-600 mt-1">Crée un fichier Excel pour chaque élève de la classe</p>
+            </div>
+
+            {/* Contenu */}
+            <div className="px-6 py-4 space-y-3">
+              <div className="p-3 rounded-lg" style={{ background: "#FCE7F3", borderLeft: "4px solid #EC4899" }}>
+                <p className="text-sm font-semibold" style={{ color: "#BE185D" }}>Classe : <strong>{classeSelectionnee}</strong></p>
+                <p className="text-xs text-stone-700 mt-1">• Un fichier par élève sera téléchargé</p>
+                <p className="text-xs text-stone-700">• Les données seront insérées dans le template Bac Pro MELEC</p>
+                <p className="text-xs text-stone-700">• Les notes des épreuves E2, E31, E32 seront calculées</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t flex gap-3" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <button
+                onClick={() => setShowDocBac(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  if (!fichierGrille || !classeSelectionnee) return;
+                  setIsSaving(true);
+                  try {
+                    await genererDocumentsBacClasse(
+                      fichierGrille,
+                      classeSelectionnee,
+                      "/bac-pro-melec-template.xlsx"
+                    );
+                    setShowDocBac(false);
+                    toast.success(`Documents Bac générés pour la classe "${classeSelectionnee}"`);
+                  } catch (err) {
+                    console.error("Erreur lors de la génération:", err);
+                    toast.error("Erreur lors de la génération des documents");
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={isSaving}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                style={{ background: "#EC4899", color: "white", border: "1px solid #BE185D" }}
+              >
+                {isSaving ? "Génération..." : "Générer"}
               </button>
             </div>
           </div>

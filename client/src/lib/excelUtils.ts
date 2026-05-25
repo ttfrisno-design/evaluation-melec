@@ -53,6 +53,7 @@ export interface EntreeEvaluation {
   notesParCompetence: Record<string, number | null>; // C1 -> note /20
   noteGlobale: number | null;
   commentaire?: string; // commentaire optionnel
+  savoirEtre?: Record<string, number | null>; // id -> note 1-10
 }
 
 export interface BlocEvaluation {
@@ -61,6 +62,7 @@ export interface BlocEvaluation {
   notes: Record<string, number | null>;
   noteGlobale: number | null;
   commentaire?: string;
+  savoirEtre?: Record<string, number | null>;
 }
 
 const CODES_COMPETENCES = [
@@ -294,6 +296,10 @@ function _mettreAJourOngletEleve(
   const noteE31 = epreuves.find((r) => r.id === "E31")?.note ?? null;
   const noteE32 = epreuves.find((r) => r.id === "E32")?.note ?? null;
 
+  // Identifiants savoir-être
+  const CODES_SE = ["autonomie", "efforts", "rythme", "rigueur", "attentif"];
+  const LABELS_SE = ["🧭 Autonomie", "💪 Efforts", "⏱ Rythme", "🎯 Rigueur", "👁 Attentif"];
+
   // Définition des lignes fixes (index 0-based)
   const LIGNES_LABELS = [
     "Compétence",   // 0 : en-tête
@@ -306,6 +312,9 @@ function _mettreAJourOngletEleve(
     "E31 /20",       // 19
     "E32 /20",       // 20
     "Moy. Bac",      // 21
+    "--- Savoir-être ---", // 22 : séparateur
+    ...LABELS_SE,    // 23..27 : autonomie, efforts, rythme, rigueur, attentif
+    "Moy. Savoir-être", // 28
   ];
 
   // Lire le tableau existant ou initialiser
@@ -347,6 +356,15 @@ function _mettreAJourOngletEleve(
     noteE31 !== null ? noteE31 : "",               // 19 : E31
     noteE32 !== null ? noteE32 : "",               // 20 : E32
     moyBac  !== null ? moyBac  : "",               // 21 : Moy. Bac
+    "",                                             // 22 : séparateur
+    ...CODES_SE.map((id) => {                       // 23..27 : savoir-être
+      const v = entree.savoirEtre?.[id];
+      return v !== null && v !== undefined ? v : "";
+    }),
+    (() => {                                         // 28 : moyenne savoir-être
+      const vals = CODES_SE.map((id) => entree.savoirEtre?.[id]).filter((v): v is number => v !== null && v !== undefined);
+      return vals.length > 0 ? Math.round((vals.reduce((s,v)=>s+v,0)/vals.length)*100)/100 : "";
+    })(),
   ];
 
   // Ajouter la colonne à chaque ligne

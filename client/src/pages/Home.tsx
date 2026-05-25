@@ -59,6 +59,8 @@ import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
 import { exporterBulletinPDF } from "@/lib/pdfBulletin";
 import GestionEleves from "@/components/GestionEleves";
+import SavoirEtre from "@/components/SavoirEtre";
+import { CRITERES_SAVOIR_ETRE, couleurSavoirEtre } from "@/lib/savoirEtre";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
@@ -80,6 +82,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     setDate,
     toggleCompetence,
     setNote,
+    setSavoirEtre,
     resetNotes,
     resetAll,
     noteSur20,
@@ -88,6 +91,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     totalCoefs,
     competencesActives,
     notesParCompetence,
+    moyenneSavoirEtre,
   } = useEvaluation();
 
   // Fichier grille — synchronisé avec l'état externe (App.tsx)
@@ -125,6 +129,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
     notesParComp: Record<string, number | null>;
+    savoirEtre: Record<string, number | null>;
   } | null>(null);
 
   const fileInputGrilleRef = useRef<HTMLInputElement>(null);
@@ -265,7 +270,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     for (const n of notesParCompetence) {
       notesParComp[n.comp.code] = n.sur20;
     }
-    setConfirmData({ notesParComp });
+    setConfirmData({ notesParComp, savoirEtre: { ...state.savoirEtre } });
     setCommentaire(""); // réinitialiser le commentaire à chaque ouverture
     setShowConfirmation(true);
   };
@@ -285,6 +290,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
         notesParCompetence: confirmData.notesParComp,
         noteGlobale: noteSur20,
         commentaire: commentaire.trim() || undefined,
+        savoirEtre: confirmData.savoirEtre,
       });
 
       // Mettre à jour l'état local ET notifier App.tsx (pour le tableau de bord)
@@ -919,6 +925,8 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
               {competencesActives.map((comp) => (
                 <TableauCompetence key={comp.id} competence={comp} notes={state.notes} onNoteChange={setNote} />
               ))}
+              {/* Savoir-être */}
+              <SavoirEtre notes={state.savoirEtre} onChange={setSavoirEtre} />
               <div className="flex justify-end pb-4">
                 <button onClick={handleEnregistrer} disabled={isSaving || !eleveSelectionneInfo}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 shadow-lg"
@@ -1188,6 +1196,31 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                     })}
                 </div>
               </div>
+
+              {/* Savoir-être dans la confirmation */}
+              {Object.values(confirmData.savoirEtre).some((v) => v !== null && v !== undefined) && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Savoir-être</p>
+                  <div className="flex flex-wrap gap-2">
+                    {CRITERES_SAVOIR_ETRE.filter((c) => confirmData.savoirEtre[c.id] !== null && confirmData.savoirEtre[c.id] !== undefined)
+                      .map((critere) => {
+                        const note = confirmData.savoirEtre[critere.id]!;
+                        const { bg, text, border } = couleurSavoirEtre(note);
+                        return (
+                          <div key={critere.id}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                            style={{ background: bg, border: `1px solid ${border}` }}
+                          >
+                            <span>{critere.emoji}</span>
+                            <span style={{ color: critere.couleur }}>{critere.libelle}</span>
+                            <span className="text-stone-400">:</span>
+                            <span className="tabular-nums font-bold" style={{ color: text }}>{note}/10</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
               {/* Commentaire optionnel */}
               <div>

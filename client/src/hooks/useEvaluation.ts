@@ -2,6 +2,7 @@
 // Calcul : note /20 par compétence + note globale pondérée /20
 import { useState, useCallback } from "react";
 import { COMPETENCES, calculerNoteGlobale, calculerNoteCompetence } from "@/lib/competences";
+import { type NotesSavoirEtre, calculerMoyenneSavoirEtre } from "@/lib/savoirEtre";
 
 export interface Eleve {
   nom: string;
@@ -16,6 +17,7 @@ export interface EvaluationState {
   date: string;
   competencesSelectionnees: string[]; // codes C1, C2, ...
   notes: Record<string, number | null>; // critereId -> note brute saisie
+  savoirEtre: NotesSavoirEtre; // id -> note 1-10
 }
 
 export function useEvaluation() {
@@ -26,6 +28,7 @@ export function useEvaluation() {
     date: new Date().toISOString().split("T")[0],
     competencesSelectionnees: [],
     notes: {},
+    savoirEtre: {},
   });
 
   const setEleves = useCallback((eleves: Eleve[]) => {
@@ -60,8 +63,12 @@ export function useEvaluation() {
     }));
   }, []);
 
+  const setSavoirEtre = useCallback((id: string, val: number | null) => {
+    setState((s) => ({ ...s, savoirEtre: { ...s.savoirEtre, [id]: val } }));
+  }, []);
+
   const resetNotes = useCallback(() => {
-    setState((s) => ({ ...s, notes: {}, competencesSelectionnees: [] }));
+    setState((s) => ({ ...s, notes: {}, competencesSelectionnees: [], savoirEtre: {} }));
   }, []);
 
   const resetAll = useCallback(() => {
@@ -71,6 +78,7 @@ export function useEvaluation() {
       equipement: "",
       competencesSelectionnees: [],
       notes: {},
+      savoirEtre: {},
       date: new Date().toISOString().split("T")[0],
     }));
   }, []);
@@ -105,6 +113,8 @@ export function useEvaluation() {
   const totalObtenu = notesParComp.reduce((s, n) => s + n.obtenu, 0);
   const totalMax = notesParComp.reduce((s, n) => s + n.max, 0);
 
+  const moyenneSavoirEtre = calculerMoyenneSavoirEtre(state.savoirEtre);
+
   return {
     state,
     setEleves,
@@ -113,6 +123,7 @@ export function useEvaluation() {
     setDate,
     toggleCompetence,
     setNote,
+    setSavoirEtre,
     resetNotes,
     resetAll,
     // Note globale pondérée sur 20
@@ -122,5 +133,6 @@ export function useEvaluation() {
     totalCoefs,
     competencesActives,
     notesParCompetence,
+    moyenneSavoirEtre,
   };
 }

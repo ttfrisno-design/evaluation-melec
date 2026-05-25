@@ -826,3 +826,76 @@ export function supprimerClasse(
 
   return { wb, succes: true, message: `Classe "${nomClasse}" et ses élèves supprimés.` };
 }
+
+// ─────────────────────────────────────────────────────────────
+//  ARCHIVAGE DE CLASSE
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Archive une classe : crée un fichier de sauvegarde et réinitialise les notes de la classe.
+ * - Génère un fichier "Archive_[Classe]_[Date].xlsx" avec toutes les données actuelles
+ * - Réinitialise les notes de la classe dans le workbook principal
+ * - Retourne la grille mise à jour
+ */
+export async function archiverClasse(
+  grille: FichierGrille,
+  nomClasse: string
+): Promise<FichierGrille> {
+  // Cloner le workbook pour éviter les mutations
+  let wb = _clonerWorkbook(grille.rawWorkbook);
+
+  if (!wb.SheetNames.includes(nomClasse)) {
+    throw new Error(`La classe "${nomClasse}" n'existe pas.`);
+  }
+
+  // 1. Créer une copie du workbook pour la sauvegarde
+  const wbArchive = _clonerWorkbook(wb);
+
+  // 2. Générer le nom du fichier d'archive avec timestamp
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+  const archiveName = `Archive_${nomClasse}_${dateStr}_${timeStr}.xlsx`;
+
+  // 3. Télécharger le fichier d'archive
+  const wbout = XLSX.write(wbArchive, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  saveAs(blob, archiveName);
+
+  // 4. Réinitialiser les notes dans le workbook principal
+  // Pour chaque élève de la classe, supprimer son onglet (sauf l'en-tête de classe)
+  const wsClasse = wb.Sheets[nomClasse];
+  if (wsClasse) {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(wsClasse, { header: 1, defval: null }) as (string | null)[][];
+    for (let i = 1; i < rows.length; i++) {
+      const nom = String(rows[i][0] || "").toUpperCase().trim();
+      const prenom = String(rows[i][1] || "").trim();
+      if (nom) {
+        const nomOnglet = `${nom} ${prenom}`.slice(0, 31);
+        if (wb.Sheets[nomOnglet]) {
+          delete wb.Sheets[nomOnglet];
+          wb.SheetNames = wb.SheetNames.filter((n) => n !== nomOnglet);
+        }
+      }
+    }
+  }
+
+  // 5. Réinitialiser l'onglet classe (garder l'en-tête, vider les notes)
+  if (wsClasse) {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(wsClasse, { header: 1, defval: null }) as (string | null)[][];
+    // Garder l'en-tête (ligne 0)
+    const newRows = [rows[0]]; // En-tête
+    // Ajouter les élèves sans notes
+    for (let i = 1; i < rows.length; i++) {
+      newRows.push([rows[i][0], rows[i][1], null]); // Nom, Prénom, Note vide
+    }
+    const newWs = XLSX.utils.aoa_to_sheet(newRows);
+    wb.Sheets[nomClasse] = newWs;
+  }
+
+  // 6. Retourner la grille mise à jour
+  return {
+    classes: grille.classes,
+    rawWorkbook: wb,
+  };
+}

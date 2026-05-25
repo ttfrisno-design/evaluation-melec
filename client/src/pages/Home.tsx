@@ -19,6 +19,7 @@ import {
   telechargerFichierGrille,
   lireEvaluationsEleve,
   creerWorkbookVide,
+  archiverClasse,
   type FichierGrille,
   type EleveInfo,
   type BlocEvaluation,
@@ -54,6 +55,8 @@ import {
   BarChart2,
   FileText,
   UserPlus,
+  Archive,
+  AlertTriangle,
 } from "lucide-react";
 import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
@@ -122,6 +125,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showInfo, setShowInfo] = useState(false);
   const [showHistoEleve, setShowHistoEleve] = useState(false);
   const [showGestionEleves, setShowGestionEleves] = useState(false);
+  const [showArchiver, setShowArchiver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // drawer mobile
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -733,7 +737,29 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
               <UserPlus size={13} /> Gérer les élèves
             </button>
           )}
-          <button onClick={resetAll}
+          {fichierGrille && classeSelectionnee && (
+            <button
+              onClick={() => setShowArchiver(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: "#3C3836", color: "#FBBF24", border: "1px solid #78350F" }}
+            >
+              <Archive size={13} /> Archiver la classe
+            </button>
+          )}
+          <button
+            onClick={() => {
+              // Réinitialiser TOUT : fichier, élèves, classe, notes, savoir-être
+              setFichierGrille(null);
+              setFichierNom("grille_melec_structuree.xlsx");
+              setClasseSelectionnee("");
+              setEleveSelectionneInfo(null);
+              setHistoEleve([]);
+              setEleves([]);
+              resetAll();
+              // Réinitialiser l'input fichier
+              if (fileInputGrilleRef.current) fileInputGrilleRef.current.value = "";
+              toast.success("Application réinitialisée.");
+            }}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
             style={{ background: "#3C3836", color: "#A8A29E", border: "1px solid #57534E" }}
           >
@@ -1367,6 +1393,63 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             }
           }}
         />
+      )}
+
+      {/* ===== MODAL ARCHIVAGE ===== */}
+      {showArchiver && fichierGrille && classeSelectionnee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <h2 className="text-lg font-bold" style={{ color: "#78350F" }}>Archiver la classe</h2>
+              <p className="text-sm text-stone-600 mt-1">Sauvegarde les données actuelles et réinitialise les notes</p>
+            </div>
+
+            {/* Contenu */}
+            <div className="px-6 py-4 space-y-3">
+              <div className="p-3 rounded-lg" style={{ background: "#FEF3C7", borderLeft: "4px solid #FBBF24" }}>
+                <p className="text-sm font-semibold" style={{ color: "#78350F" }}>Classe : <strong>{classeSelectionnee}</strong></p>
+                <p className="text-xs text-stone-700 mt-1">• Un fichier de sauvegarde sera créé</p>
+                <p className="text-xs text-stone-700">• Les notes actuelles seront conservées dans le fichier Excel</p>
+                <p className="text-xs text-stone-700">• Les notes de la classe seront réinitialisées</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t flex gap-3" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <button
+                onClick={() => setShowArchiver(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  if (!fichierGrille || !classeSelectionnee) return;
+                  setIsSaving(true);
+                  try {
+                    const grilleArchivee = await archiverClasse(fichierGrille, classeSelectionnee);
+                    setFichierGrilleLocal(grilleArchivee);
+                    onFichierGrilleChange?.(grilleArchivee);
+                    setShowArchiver(false);
+                    toast.success(`Classe "${classeSelectionnee}" archivée avec succès`);
+                  } catch (err) {
+                    console.error("Erreur lors de l'archivage:", err);
+                    toast.error("Erreur lors de l'archivage");
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={isSaving}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                style={{ background: "#FBBF24", color: "#78350F", border: "1px solid #F59E0B" }}
+              >
+                {isSaving ? "Archivage..." : "Archiver"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

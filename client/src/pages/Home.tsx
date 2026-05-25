@@ -128,6 +128,8 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showGestionEleves, setShowGestionEleves] = useState(false);
   const [showArchiver, setShowArchiver] = useState(false);
   const [showDocBac, setShowDocBac] = useState(false);
+  const [showNumCandidats, setShowNumCandidats] = useState(false);
+  const [numeroCandidats, setNumeroCandidats] = useState<Record<string, string>>({}); // key: "NOM Prenom", value: numero
   const [sidebarOpen, setSidebarOpen] = useState(false); // drawer mobile
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -1493,16 +1495,107 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 Annuler
               </button>
               <button
+                onClick={() => {
+                  setShowDocBac(false);
+                  setShowNumCandidats(true);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#EC4899", color: "white", border: "1px solid #BE185D" }}
+              >
+                Continuer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL NUMÉROS DE CANDIDATS ===== */}
+      {showNumCandidats && fichierGrille && classeSelectionnee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <h2 className="text-lg font-bold" style={{ color: "#BE185D" }}>Numéros de candidats</h2>
+              <p className="text-sm text-stone-600 mt-1">Saisir le numéro de candidat pour chaque élève</p>
+            </div>
+
+            {/* Contenu */}
+            <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
+              {fichierGrille.classes
+                .find((c) => c.nom === classeSelectionnee)
+                ?.eleves.map((eleve) => {
+                  const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
+                  return (
+                    <div key={key} className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-stone-900">{eleve.prenom} {eleve.nom}</p>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Ex: A2026 0001 0001"
+                        value={numeroCandidats[key] || ""}
+                        onChange={(e) => {
+                          setNumeroCandidats({
+                            ...numeroCandidats,
+                            [key]: e.target.value,
+                          });
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm border"
+                        style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}
+                      />
+                    </div>
+                  );
+                }) || []}
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 py-4 border-t flex gap-3" style={{ borderColor: "#E7E5E4", background: "#FAFAF9" }}>
+              <button
+                onClick={() => setShowNumCandidats(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "#F5F5F4", color: "#57534E", border: "1px solid #E7E5E4" }}
+              >
+                Annuler
+              </button>
+              <button
                 onClick={async () => {
                   if (!fichierGrille || !classeSelectionnee) return;
                   setIsSaving(true);
                   try {
-                    await genererDocumentsBacClasse(
-                      fichierGrille,
-                      classeSelectionnee,
-                      "/bac-pro-melec-template.xlsx"
-                    );
-                    setShowDocBac(false);
+                    // Récupérer les élèves de la classe
+                    const classeData = fichierGrille.classes.find((c) => c.nom === classeSelectionnee);
+                    if (!classeData) throw new Error("Classe non trouvée");
+
+                    // Générer les documents avec les numéros de candidats saisis
+                    for (let i = 0; i < classeData.eleves.length; i++) {
+                      const eleve = classeData.eleves[i];
+                      const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
+                      const numeroCandidat = numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
+
+                      const { extraireDonneesBacEleve, genererDocumentBacEleve } = await import("@/lib/bacProMelecExport");
+                      const donnees = extraireDonneesBacEleve(
+                        fichierGrille,
+                        classeSelectionnee,
+                        eleve.nom,
+                        eleve.prenom,
+                        numeroCandidat
+                      );
+
+                      const wb = await genererDocumentBacEleve("/bac-pro-melec-template.xlsx", donnees);
+
+                      // Télécharger le fichier
+                      const { saveAs } = await import("file-saver");
+                      const XLSX = await import("xlsx");
+                      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+                      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                      const filename = `Bac_${classeSelectionnee}_${eleve.nom}_${eleve.prenom}.xlsx`;
+                      saveAs(blob, filename);
+
+                      // Petit délai pour éviter les problèmes de téléchargement simultané
+                      await new Promise((resolve) => setTimeout(resolve, 500));
+                    }
+
+                    setShowNumCandidats(false);
                     toast.success(`Documents Bac générés pour la classe "${classeSelectionnee}"`);
                   } catch (err) {
                     console.error("Erreur lors de la génération:", err);

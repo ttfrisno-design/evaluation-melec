@@ -41,7 +41,7 @@ function extractCellStyle(cell: any): CellStyle {
   
   // Note: xlsx (community) ne charge pas les styles par défaut
   // Cette fonction retourne un objet vide pour la plupart des cas
-  // Les styles sont appliqués via les classes CSS basées sur les couleurs RGB
+  // Les styles sont appliqués via les couleurs RGB directes
   
   try {
     if (!cell) return style;
@@ -71,44 +71,8 @@ function extractCellStyle(cell: any): CellStyle {
 }
 
 /**
- * Nettoie les styles CSS pour les rendre compatibles avec html2pdf
- */
-function cleanCssForPdf(html: string): string {
-  // Remplacer les couleurs oklch par des couleurs rgb
-  // oklch(L% C H) -> rgb(r, g, b)
-  html = html.replace(/oklch\([^)]+\)/g, 'rgb(200, 200, 200)');
-  
-  // Remplacer les couleurs hsl par des couleurs rgb
-  // hsl(H, S%, L%) -> rgb(r, g, b)
-  html = html.replace(/hsl\(([^,]+),\s*([^,]+),\s*([^)]+)\)/g, (match, h, s, l) => {
-    const hue = parseFloat(h);
-    const sat = parseFloat(s) / 100;
-    const light = parseFloat(l) / 100;
-    
-    const c = (1 - Math.abs(2 * light - 1)) * sat;
-    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-    const m = light - c / 2;
-    
-    let r = 0, g = 0, b = 0;
-    if (hue < 60) { r = c; g = x; b = 0; }
-    else if (hue < 120) { r = x; g = c; b = 0; }
-    else if (hue < 180) { r = 0; g = c; b = x; }
-    else if (hue < 240) { r = 0; g = x; b = c; }
-    else if (hue < 300) { r = x; g = 0; b = c; }
-    else { r = c; g = 0; b = x; }
-    
-    r = Math.round((r + m) * 255);
-    g = Math.round((g + m) * 255);
-    b = Math.round((b + m) * 255);
-    
-    return `rgb(${r}, ${g}, ${b})`;
-  });
-  
-  return html;
-}
-
-/**
  * Génère un HTML stylé à partir d'un workbook Excel
+ * Utilise uniquement des styles inline sans classes CSS pour éviter les problèmes avec html2pdf
  */
 export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Paramètres"): string {
   const ws = wb.Sheets[sheetName];
@@ -117,94 +81,53 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
   // Obtenir les dimensions de la feuille
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
   
-  let html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        
-        body {
-          font-family: Calibri, Arial, sans-serif;
-          font-size: 11pt;
-          line-height: 1.2;
-          padding: 20px;
-          background: white;
-        }
-        
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          table-layout: fixed;
-        }
-        
-        td {
-          border: 1px solid #999999;
-          padding: 4px 6px;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          white-space: normal;
-        }
-        
-        .header {
-          font-weight: bold;
-          background-color: #D3D3D3;
-          text-align: center;
-        }
-        
-        .gray-light {
-          background-color: #BDD6EE;
-        }
-        
-        .gray-medium {
-          background-color: #9CC2E5;
-        }
-        
-        .gray-dark {
-          background-color: #DEEAF6;
-        }
-        
-        .green-light {
-          background-color: #C5E0B3;
-        }
-        
-        .yellow-light {
-          background-color: #FFFF99;
-        }
-        
-        .center {
-          text-align: center;
-        }
-        
-        .right {
-          text-align: right;
-        }
-        
-        .left {
-          text-align: left;
-        }
-        
-        .top {
-          vertical-align: top;
-        }
-        
-        .middle {
-          vertical-align: middle;
-        }
-        
-        .bottom {
-          vertical-align: bottom;
-        }
-      </style>
-    </head>
-    <body>
-      <table>
-  `;
+  let html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.2;
+      padding: 20px;
+      background: white;
+    }
+    
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+    }
+    
+    td {
+      border: 1px solid #999999;
+      padding: 4px 6px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <table>
+`;
+  
+  // Couleurs prédéfinies du template Excel
+  const colorMap: Record<string, string> = {
+    "FFBDD6EE": "rgb(189, 214, 238)",  // Gris clair
+    "FF9CC2E5": "rgb(156, 194, 229)",  // Gris moyen
+    "FFDEEAF6": "rgb(222, 234, 246)",  // Gris foncé
+    "FFC5E0B3": "rgb(197, 224, 179)",  // Vert clair
+    "FFFFFF99": "rgb(255, 255, 153)",  // Jaune clair
+  };
   
   // Parcourir les lignes et colonnes
   for (let row = range.s.r; row <= range.e.r; row++) {
@@ -216,7 +139,6 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
       
       let cellValue = "";
       let cellStyle = "";
-      let cellClass = "";
       
       if (cell) {
         // Obtenir la valeur
@@ -232,21 +154,24 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
         // Extraire les styles
         const style = extractCellStyle(cell);
         
-        // Construire les classes CSS
+        // Construire les styles inline
+        const styleProps: string[] = [];
+        
+        // Couleur de fond - utiliser la couleur RGB directe
         if (cell.fill && cell.fill.start_color) {
           const color = cell.fill.start_color;
           if (typeof color.rgb === "string") {
             const rgb = color.rgb.toUpperCase();
-            if (rgb === "FFBDD6EE") {
-              cellClass += " gray-light";
-            } else if (rgb === "FF9CC2E5") {
-              cellClass += " gray-medium";
-            } else if (rgb === "FFDEEAF6") {
-              cellClass += " gray-dark";
-            } else if (rgb === "FFC5E0B3") {
-              cellClass += " green-light";
-            } else if (rgb === "FFFFFF99") {
-              cellClass += " yellow-light";
+            const mappedColor = colorMap[rgb];
+            if (mappedColor) {
+              styleProps.push(`background-color: ${mappedColor}`);
+            } else if (rgb.startsWith("FF")) {
+              // Convertir directement si pas dans la map
+              try {
+                styleProps.push(`background-color: ${hexToRgb(rgb)}`);
+              } catch (e) {
+                // Ignorer
+              }
             }
           }
         }
@@ -254,18 +179,14 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
         // Alignement
         if (cell.alignment) {
           if (cell.alignment.horizontal) {
-            cellClass += ` ${cell.alignment.horizontal}`;
+            styleProps.push(`text-align: ${cell.alignment.horizontal}`);
           }
           if (cell.alignment.vertical) {
-            cellClass += ` ${cell.alignment.vertical}`;
+            styleProps.push(`vertical-align: ${cell.alignment.vertical}`);
           }
         }
         
-        // Construire les styles inline
-        const styleProps: string[] = [];
-        if (style.backgroundColor) {
-          styleProps.push(`background-color: ${style.backgroundColor}`);
-        }
+        // Police
         if (style.fontWeight) {
           styleProps.push(`font-weight: ${style.fontWeight}`);
         }
@@ -281,20 +202,17 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
         }
       }
       
-      html += `<td ${cellStyle} class="${cellClass.trim()}">${cellValue}</td>`;
+      html += `<td ${cellStyle}>${cellValue}</td>`;
     }
     
     html += "</tr>";
   }
   
   html += `
-      </table>
-    </body>
-    </html>
-  `;
-  
-  // Nettoyer les styles CSS pour la compatibilité avec html2pdf
-  html = cleanCssForPdf(html);
+  </table>
+</body>
+</html>
+`;
   
   return html;
 }
@@ -304,35 +222,29 @@ export function workbookToStyledHtml(wb: XLSX.WorkBook, sheetName: string = "Par
  */
 export async function workbookToStyledPdf(
   wb: XLSX.WorkBook,
-  sheetName: string = "Paramètres",
-  filename: string = "document.pdf"
+  sheetName: string,
+  filename: string
 ): Promise<Blob> {
-  const html = workbookToStyledHtml(wb, sheetName);
+  const html2pdf = (await import("html2pdf.js")).default;
   
-  // Créer un élément DOM temporaire
-  const element = document.createElement("div");
-  element.innerHTML = html;
-  element.style.display = "none";
-  document.body.appendChild(element);
+  // Générer le HTML
+  const htmlContent = workbookToStyledHtml(wb, sheetName);
   
-  try {
-    // Générer le PDF avec html2pdf
-    const html2pdf = (await import("html2pdf.js")).default;
-    
-    const pdf = await html2pdf()
-      .set({
-        margin: 5,
-        filename: filename,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
-      })
-      .from(element)
-      .toPdf()
-      .output("blob");
-    
-    return pdf;
-  } finally {
-    document.body.removeChild(element);
-  }
+  // Options pour html2pdf
+  const options = {
+    margin: 10,
+    filename: filename,
+    image: { type: "png" as const, quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: "portrait" as const, unit: "mm" as const, format: "a4" as const },
+  };
+  
+  return new Promise((resolve, reject) => {
+    html2pdf()
+      .set(options)
+      .from(htmlContent)
+      .outputPdf("blob")
+      .then((pdf: Blob) => resolve(pdf))
+      .catch((err: any) => reject(err));
+  });
 }

@@ -1562,39 +1562,13 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                   if (!fichierGrille || !classeSelectionnee) return;
                   setIsSaving(true);
                   try {
-                    // Récupérer les élèves de la classe
-                    const classeData = fichierGrille.classes.find((c) => c.nom === classeSelectionnee);
-                    if (!classeData) throw new Error("Classe non trouvée");
-
-                    // Générer les documents avec les numéros de candidats saisis
-                    for (let i = 0; i < classeData.eleves.length; i++) {
-                      const eleve = classeData.eleves[i];
-                      const key = `${eleve.nom.toUpperCase()} ${eleve.prenom}`;
-                      const numeroCandidat = numeroCandidats[key] || `A2026 0000 ${String(i + 1).padStart(4, "0")}`;
-
-                      const { extraireDonneesBacEleve, genererDocumentBacEleve } = await import("@/lib/bacProMelecExport");
-                      const donnees = extraireDonneesBacEleve(
-                        fichierGrille,
-                        classeSelectionnee,
-                        eleve.nom,
-                        eleve.prenom,
-                        numeroCandidat
-                      );
-
-                      const wb = await genererDocumentBacEleve("/bac-pro-melec-template.xlsx", donnees);
-
-                      // Télécharger le fichier
-                      const { saveAs } = await import("file-saver");
-                      const XLSX = await import("xlsx");
-                      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-                      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                      const filename = `Bac_${classeSelectionnee}_${eleve.nom}_${eleve.prenom}.xlsx`;
-                      saveAs(blob, filename);
-
-                      // Petit délai pour éviter les problèmes de téléchargement simultané
-                      await new Promise((resolve) => setTimeout(resolve, 500));
-                    }
-
+                    const { genererPdfsBacClasse } = await import("@/lib/bacProMelecPdf");
+                    await genererPdfsBacClasse(
+                      fichierGrille,
+                      classeSelectionnee,
+                      "/bac-pro-melec-template.xlsx",
+                      numeroCandidats
+                    );
                     setShowNumCandidats(false);
                     toast.success(`Documents Bac générés pour la classe "${classeSelectionnee}"`);
                   } catch (err) {

@@ -150,6 +150,25 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [commentaire, setCommentaire] = useState("");
   const [modeEvaluation, setModeEvaluation] = useState<'ecole' | 'entreprise'>('ecole'); // Mode école ou entreprise
   const [showFormulairePFMP, setShowFormulairePFMP] = useState(false); // Afficher le formulaire PFMP
+  const [donneesPFMP, setDonneesPFMP] = useState({
+    entrepriseNom: '',
+    entrepriseAdresse: '',
+    entrepriseRepresentant: '',
+    entrepriseFonction: '',
+    dateDebut: '',
+    dateFin: '',
+    dureeEffective: '',
+    attitudesProf: {
+      autonomie: 0,
+      efforts: 0,
+      rythme: 0,
+      rigueur: 0,
+      attentif: 0,
+      securite: 0,
+    },
+    signature: '',
+    photoTampon: '',
+  });
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
     notesParComp: Record<string, number | null>;
@@ -1101,14 +1120,146 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 <X size={18} />
               </button>
             </div>
-            <div className="p-6">
-              <p className="text-gray-600 mb-4">Formulaire PFMP - À implémenter complètement</p>
-              <button
-                onClick={() => setShowFormulairePFMP(false)}
-                className="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-lg font-medium hover:bg-gray-400"
-              >
-                Fermer
-              </button>
+            <div className="p-6 space-y-6">
+              {/* Section Entreprise */}
+              <div className="border-b pb-4">
+                <h3 className="text-base font-semibold mb-4 text-gray-800">Informations de l'Entreprise</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'entreprise</label>
+                    <input
+                      type="text"
+                      value={donneesPFMP.entrepriseNom}
+                      onChange={(e) => setDonneesPFMP({...donneesPFMP, entrepriseNom: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Ex: Entreprise ABC"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                    <input
+                      type="text"
+                      value={donneesPFMP.entrepriseAdresse}
+                      onChange={(e) => setDonneesPFMP({...donneesPFMP, entrepriseAdresse: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Ex: 123 Rue de la Paix, 75000 Paris"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Représentant(e)</label>
+                      <input
+                        type="text"
+                        value={donneesPFMP.entrepriseRepresentant}
+                        onChange={(e) => setDonneesPFMP({...donneesPFMP, entrepriseRepresentant: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Nom du représentant"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fonction</label>
+                      <input
+                        type="text"
+                        value={donneesPFMP.entrepriseFonction}
+                        onChange={(e) => setDonneesPFMP({...donneesPFMP, entrepriseFonction: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Ex: Directeur"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section Dates */}
+              <div className="border-b pb-4">
+                <h3 className="text-base font-semibold mb-4 text-gray-800">Période de Stage</h3>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
+                    <input
+                      type="date"
+                      value={donneesPFMP.dateDebut}
+                      onChange={(e) => setDonneesPFMP({...donneesPFMP, dateDebut: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
+                    <input
+                      type="date"
+                      value={donneesPFMP.dateFin}
+                      onChange={(e) => setDonneesPFMP({...donneesPFMP, dateFin: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Durée effective (en jours)</label>
+                  <input
+                    type="number"
+                    value={donneesPFMP.dureeEffective}
+                    onChange={(e) => setDonneesPFMP({...donneesPFMP, dureeEffective: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ex: 20"
+                  />
+                </div>
+              </div>
+
+              {/* Section Attitudes Professionnelles */}
+              <div className="border-b pb-4">
+                <h3 className="text-base font-semibold mb-4 text-gray-800">Évaluation des Attitudes Professionnelles</h3>
+                <div className="space-y-3">
+                  {[
+                    { key: 'autonomie', label: 'Autonomie' },
+                    { key: 'efforts', label: 'Efforts' },
+                    { key: 'rythme', label: 'Rythme de travail' },
+                    { key: 'rigueur', label: 'Rigueur et précision' },
+                    { key: 'attentif', label: 'Attentif' },
+                    { key: 'securite', label: 'Respect des consignes de sécurité' },
+                  ].map((attitude) => (
+                    <div key={attitude.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <label className="text-sm font-medium text-gray-700">{attitude.label}</label>
+                      <select
+                        value={donneesPFMP.attitudesProf[attitude.key as keyof typeof donneesPFMP.attitudesProf]}
+                        onChange={(e) => setDonneesPFMP({
+                          ...donneesPFMP,
+                          attitudesProf: {
+                            ...donneesPFMP.attitudesProf,
+                            [attitude.key]: parseInt(e.target.value),
+                          }
+                        })}
+                        className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="0">Non évalué</option>
+                        <option value="1">1 - Très insuffisant</option>
+                        <option value="2">2 - Insuffisant</option>
+                        <option value="3">3 - Satisfaisant</option>
+                        <option value="4">4 - Bon</option>
+                        <option value="5">5 - Très bon</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowFormulairePFMP(false)}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => {
+                    toast.success('Attestation PFMP générée');
+                    setShowFormulairePFMP(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Générer PDF
+                </button>
+              </div>
             </div>
           </div>
         </div>

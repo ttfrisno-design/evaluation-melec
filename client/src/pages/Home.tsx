@@ -149,6 +149,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [evaluationEnCours, setEvaluationEnCours] = useState<string | null>(null); // ID de l'évaluation en cours
   const [commentaire, setCommentaire] = useState("");
   const [modeEvaluation, setModeEvaluation] = useState<'ecole' | 'entreprise'>('ecole'); // Mode école ou entreprise
+  const [showFormulairePFMP, setShowFormulairePFMP] = useState(false); // Afficher le formulaire PFMP
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
     notesParComp: Record<string, number | null>;
@@ -840,10 +841,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
               )}
               {modeEvaluation === 'entreprise' && (
                 <button
-                  onClick={() => {
-                    // Ouvrir le formulaire PFMP
-                    toast.info('Formulaire PFMP - À implémenter');
-                  }}
+                  onClick={() => setShowFormulairePFMP(true)}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
                   style={{ background: "#B45309", color: "#FEF3C7", border: "1px solid #92400E" }}
                 >
@@ -1088,6 +1086,32 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
           }}
           onClose={() => setShowChargerEval(false)}
         />
+      )}
+
+      {/* Modale Formulaire PFMP */}
+      {showFormulairePFMP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">Attestation PFMP</h2>
+              <button
+                onClick={() => setShowFormulairePFMP(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">Formulaire PFMP - À implémenter complètement</p>
+              <button
+                onClick={() => setShowFormulairePFMP(false)}
+                className="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-lg font-medium hover:bg-gray-400"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </main>

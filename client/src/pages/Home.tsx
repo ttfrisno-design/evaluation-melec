@@ -75,6 +75,7 @@ import {
 } from "@/lib/evaluationStorage";
 import ChargerEvaluationSauvegardee from "@/components/ChargerEvaluationSauvegardee";
 import CommentairesObservationsInline from "@/components/CommentairesObservationsInline";
+import { SignaturePad } from '@/components/SignaturePad';
 import { EvaluationSauvegardee, EleveEvaluationSauvegardee } from "@/lib/excelUtils";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
@@ -1240,6 +1241,17 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Section Signature */}
+              <div className="border-b pb-4">
+                <h3 className="text-base font-semibold mb-4 text-gray-800">Signature de l'Évaluateur</h3>
+                <p className="text-sm text-gray-600 mb-3">Veuillez signer ci-dessous</p>
+                <SignaturePad
+                  onSignatureChange={(sig) => setDonneesPFMP({...donneesPFMP, signature: sig})}
+                  width={350}
+                  height={120}
+                />
               </div>
 
               {/* Boutons d'action */}

@@ -218,6 +218,60 @@ function _clonerWorkbook(wb: XLSX.WorkBook): XLSX.WorkBook {
  *  3. Met à jour l'onglet élève : blocs Date + C1..C13 + Note globale
  *  4. Met à jour l'onglet Récap Bac
  */
+
+// ── Évaluation des attitudes professionnelles ──
+export interface AttitudeProfessionnelle {
+  id: string;
+  nom: string;
+  description: string;
+  note: number | null; // 1-5
+}
+
+export const ATTITUDES_PROFESSIONNELLES: AttitudeProfessionnelle[] = [
+  { id: 'autonomie', nom: 'Autonomie', description: 'Capable de travailler de manière indépendante', note: null },
+  { id: 'ponctualite', nom: 'Ponctualité', description: 'Respecte les horaires et délais', note: null },
+  { id: 'securite', nom: 'Respect des règles de sécurité', description: 'Applique les consignes de sécurité', note: null },
+  { id: 'communication', nom: 'Communication', description: 'Communique efficacement avec l\'équipe', note: null },
+  { id: 'responsabilite', nom: 'Responsabilité', description: 'Assume ses responsabilités', note: null },
+  { id: 'qualite', nom: 'Qualité du travail', description: 'Produit un travail de qualité', note: null },
+];
+
+// ── Attestation PFMP ──
+export interface AttestationPFMP {
+  id: string;
+  eleveNom: string;
+  elevePrenom: string;
+  eleveNumero: string;
+  eleveClasse: string;
+  
+  entrepriseNom: string;
+  entrepriseAdresse: string;
+  entrepriseRepresentant: string;
+  entrepriseFonction: string;
+  
+  ecoleNom: string;
+  ecoleAdresse: string;
+  ecoleRepresentant: string;
+  
+  dateDebut: string;
+  dateFin: string;
+  dureeJours: number;
+  
+  attitudesProfessionnelles: Record<string, number | null>;
+  
+  signatureDate: string;
+  signatureData: string; // base64 de la signature
+  signaturePad: boolean; // true si PAD, false si écran
+  
+  tamponPhoto: string; // base64 de la photo du tampon
+  
+  observations: string;
+}
+
+// ── Mode d'évaluation ──
+export type ModeEvaluation = 'ecole' | 'entreprise';
+
+
 export function enregistrerEvaluation(
   wb: XLSX.WorkBook,
   entree: EntreeEvaluation

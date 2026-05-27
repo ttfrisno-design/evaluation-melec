@@ -18,6 +18,7 @@ export interface EvaluationState {
   competencesSelectionnees: string[]; // codes C1, C2, ...
   notes: Record<string, number | null>; // critereId -> note brute saisie
   savoirEtre: NotesSavoirEtre; // id -> note 1-10
+  commentairesPersonnalises: string[]; // liste des commentaires et observations
 }
 
 export function useEvaluation() {
@@ -29,6 +30,7 @@ export function useEvaluation() {
     competencesSelectionnees: [],
     notes: {},
     savoirEtre: {},
+    commentairesPersonnalises: [],
   });
 
   const setEleves = useCallback((eleves: Eleve[]) => {
@@ -67,8 +69,12 @@ export function useEvaluation() {
     setState((s) => ({ ...s, savoirEtre: { ...s.savoirEtre, [id]: val } }));
   }, []);
 
+  const setCommentairesPersonnalises = useCallback((commentaires: string[]) => {
+    setState((s) => ({ ...s, commentairesPersonnalises: commentaires }));
+  }, []);
+
   const resetNotes = useCallback(() => {
-    setState((s) => ({ ...s, notes: {}, competencesSelectionnees: [], savoirEtre: {} }));
+    setState((s) => ({ ...s, notes: {}, competencesSelectionnees: [], savoirEtre: {}, commentairesPersonnalises: [] }));
   }, []);
 
   const resetAll = useCallback(() => {
@@ -79,6 +85,7 @@ export function useEvaluation() {
       competencesSelectionnees: [],
       notes: {},
       savoirEtre: {},
+      commentairesPersonnalises: [],
       date: new Date().toISOString().split("T")[0],
     }));
   }, []);
@@ -124,6 +131,7 @@ export function useEvaluation() {
     toggleCompetence,
     setNote,
     setSavoirEtre,
+    setCommentairesPersonnalises,
     resetNotes,
     resetAll,
     // Note globale pondérée sur 20

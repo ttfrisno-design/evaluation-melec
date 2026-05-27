@@ -74,6 +74,7 @@ import {
   mettreAJourEvaluation,
 } from "@/lib/evaluationStorage";
 import ChargerEvaluationSauvegardee from "@/components/ChargerEvaluationSauvegardee";
+import CommentairesObservationsInline from "@/components/CommentairesObservationsInline";
 import { EvaluationSauvegardee, EleveEvaluationSauvegardee } from "@/lib/excelUtils";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
@@ -97,6 +98,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
     toggleCompetence,
     setNote,
     setSavoirEtre,
+    setCommentairesPersonnalises,
     resetNotes,
     resetAll,
     noteSur20,
@@ -1013,6 +1015,11 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
               ))}
               {/* Savoir-être */}
               <SavoirEtre notes={state.savoirEtre} onChange={setSavoirEtre} />
+              {/* Commentaires & Observations */}
+              <CommentairesObservationsInline
+                commentaires={state.commentairesPersonnalises || []}
+                onCommentairesChange={setCommentairesPersonnalises}
+              />
               <div className="flex justify-end pb-4">
                 <button onClick={handleEnregistrer} disabled={isSaving || !eleveSelectionneInfo}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 shadow-lg"

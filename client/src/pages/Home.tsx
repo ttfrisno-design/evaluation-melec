@@ -169,6 +169,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
       securite: 0,
     },
     signature: '',
+    signatureTuteur: '',
     photoTampon: '',
   });
   // Données pré-calculées pour la modale de confirmation
@@ -1250,6 +1251,17 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 <p className="text-sm text-gray-600 mb-3">Veuillez signer ci-dessous</p>
                 <SignaturePad
                   onSignatureChange={(sig) => setDonneesPFMP({...donneesPFMP, signature: sig})}
+                  width={350}
+                  height={120}
+                />
+              </div>
+
+              {/* Section Signature Tuteur */}
+              <div className="border-b pb-4">
+                <h3 className="text-base font-semibold mb-4 text-gray-800">Signature du Tuteur en Entreprise</h3>
+                <p className="text-sm text-gray-600 mb-3">Veuillez signer ci-dessous</p>
+                <SignaturePad
+                  onSignatureChange={(sig) => setDonneesPFMP({...donneesPFMP, signatureTuteur: sig})}
                   width={350}
                   height={120}
                 />

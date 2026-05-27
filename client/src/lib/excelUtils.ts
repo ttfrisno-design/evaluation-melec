@@ -64,6 +64,35 @@ export interface BlocEvaluation {
   noteGlobale: number | null;
   commentaire?: string;
   savoirEtre?: Record<string, number | null>;
+  observations?: string[];
+}
+
+// Présets de commentaires prédéfinis
+export const COMMENTAIRES_PRESETS = [
+  "Travail satisfaisant",
+  "Travail insuffisant",
+  "Méthode maîtrisée",
+  "Méthode non maîtrisée",
+  "Manque de connaissances",
+  "Respecte les consignes de sécurité",
+  "Consignes de sécurité respectées mais en cours d'évaluation",
+];
+
+export interface EvaluationSauvegardee {
+  id: string; // identifiant unique
+  nomFichier: string;
+  dateCreation: number; // timestamp
+  dateModification: number; // timestamp
+  classe: string;
+  eleves: Record<string, EleveEvaluationSauvegardee>;
+}
+
+export interface EleveEvaluationSauvegardee {
+  nom: string;
+  prenom: string;
+  numeroCandidat?: string;
+  evaluations: BlocEvaluation[];
+  commentairesPersonnalises: string[];
 }
 
 const CODES_COMPETENCES = [

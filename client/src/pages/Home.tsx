@@ -57,6 +57,8 @@ import {
   UserPlus,
   Archive,
   AlertTriangle,
+  Save,
+  FolderOpen,
 } from "lucide-react";
 import TableauCompetence from "@/components/TableauCompetence";
 import RecapitulatifNote from "@/components/RecapitulatifNote";
@@ -65,6 +67,14 @@ import GestionEleves from "@/components/GestionEleves";
 import SavoirEtre from "@/components/SavoirEtre";
 import { CRITERES_SAVOIR_ETRE, couleurSavoirEtre } from "@/lib/savoirEtre";
 import { genererDocumentsBacClasse } from "@/lib/bacProMelecExport";
+import {
+  sauvegarderEvaluation,
+  chargerEvaluation,
+  listerEvaluationsSauvegardees,
+  mettreAJourEvaluation,
+} from "@/lib/evaluationStorage";
+import ChargerEvaluationSauvegardee from "@/components/ChargerEvaluationSauvegardee";
+import { EvaluationSauvegardee, EleveEvaluationSauvegardee } from "@/lib/excelUtils";
 
 // Client ID Google OAuth2 — à renseigner par l'utilisateur dans les paramètres
 const GOOGLE_CLIENT_ID_KEY = "melec_google_client_id";
@@ -133,6 +143,8 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [sidebarOpen, setSidebarOpen] = useState(false); // drawer mobile
   const [histoEleve, setHistoEleve] = useState<BlocEvaluation[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showChargerEval, setShowChargerEval] = useState(false);
+  const [evaluationEnCours, setEvaluationEnCours] = useState<string | null>(null); // ID de l'évaluation en cours
   const [commentaire, setCommentaire] = useState("");
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
@@ -748,6 +760,41 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{ background: "#3C3836", color: "#EC4899", border: "1px solid #BE185D" }}
               >
+              <button
+                onClick={() => {
+                  // Sauvegarder l'évaluation en cours
+                  const elevesSauvegarde: Record<string, EleveEvaluationSauvegardee> = {};
+                  if (fichierGrille && classeSelectionnee) {
+                    const classe = fichierGrille.classes.find(c => c.nom === classeSelectionnee);
+                    if (classe) {
+                      classe.eleves.forEach(eleve => {
+                        const key = `${eleve.nom} ${eleve.prenom}`;
+                        elevesSauvegarde[key] = {
+                          nom: eleve.nom,
+                          prenom: eleve.prenom,
+                          numeroCandidat: eleve.numeroCandidat,
+                          evaluations: [],
+                          commentairesPersonnalises: [],
+                        };
+                      });
+                    }
+                  }
+                  const id = sauvegarderEvaluation(classeSelectionnee, elevesSauvegarde, fichierNom);
+                  setEvaluationEnCours(id);
+                  toast.success(`Évaluation sauvegardée (ID: ${id.substring(0, 8)})`);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{ background: "#1e40af", color: "#DBEAFE", border: "1px solid #1e3a8a" }}
+              >
+                <Save size={13} /> Sauvegarder l'évaluation
+              </button>
+              <button
+                onClick={() => setShowChargerEval(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{ background: "#065f46", color: "#D1FAE5", border: "1px solid #064e3b" }}
+              >
+                <FolderOpen size={13} /> Charger une évaluation
+              </button>
                 <FileText size={13} /> Document Bac
               </button>
               <button
@@ -978,7 +1025,21 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             </>
           )}
         </div>
-      </main>
+      
+      {/* Modale Charger Évaluation Sauvegardée */}
+      {showChargerEval && (
+        <ChargerEvaluationSauvegardee
+          onCharger={(evaluation) => {
+            // Charger l'évaluation sauvegardée
+            setEvaluationEnCours(evaluation.id);
+            toast.success("Évaluation chargée avec succès");
+            // Ici, vous pouvez restaurer les données de l'évaluation si nécessaire
+          }}
+          onClose={() => setShowChargerEval(false)}
+        />
+      )}
+
+    </main>
 
       {/* ===== MODAL GOOGLE DRIVE ===== */}
       {showDriveModal && (

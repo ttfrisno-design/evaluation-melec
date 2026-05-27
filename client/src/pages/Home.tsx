@@ -148,6 +148,7 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
   const [showChargerEval, setShowChargerEval] = useState(false);
   const [evaluationEnCours, setEvaluationEnCours] = useState<string | null>(null); // ID de l'évaluation en cours
   const [commentaire, setCommentaire] = useState("");
+  const [modeEvaluation, setModeEvaluation] = useState<'ecole' | 'entreprise'>('ecole'); // Mode école ou entreprise
   // Données pré-calculées pour la modale de confirmation
   const [confirmData, setConfirmData] = useState<{
     notesParComp: Record<string, number | null>;
@@ -585,6 +586,35 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
             )}
           </section>
 
+          {/* === Mode Évaluation === */}
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3 flex items-center gap-2">
+              <Wrench size={12} /> Mode Évaluation
+            </h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setModeEvaluation('ecole')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  modeEvaluation === 'ecole'
+                    ? 'bg-blue-600 text-white border border-blue-500'
+                    : 'bg-stone-700 text-stone-300 border border-stone-600 hover:bg-stone-600'
+                }`}
+              >
+                🏫 École
+              </button>
+              <button
+                onClick={() => setModeEvaluation('entreprise')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  modeEvaluation === 'entreprise'
+                    ? 'bg-amber-600 text-white border border-amber-500'
+                    : 'bg-stone-700 text-stone-300 border border-stone-600 hover:bg-stone-600'
+                }`}
+              >
+                🏗️ Entreprise
+              </button>
+            </div>
+          </section>
+
           {/* === Classe === */}
           {fichierGrille && (
             <section>
@@ -799,13 +829,27 @@ export default function Home({ onShowDashboard, onFichierGrilleChange, fichierGr
               </button>
                 <FileText size={13} /> Document Bac
               </button>
-              <button
-                onClick={() => setShowArchiver(true)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                style={{ background: "#3C3836", color: "#FBBF24", border: "1px solid #78350F" }}
-              >
-                <Archive size={13} /> Archiver la classe
-              </button>
+              {modeEvaluation === 'ecole' && (
+                <button
+                  onClick={() => setShowArchiver(true)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{ background: "#3C3836", color: "#FBBF24", border: "1px solid #78350F" }}
+                >
+                  <Archive size={13} /> Archiver la classe
+                </button>
+              )}
+              {modeEvaluation === 'entreprise' && (
+                <button
+                  onClick={() => {
+                    // Ouvrir le formulaire PFMP
+                    toast.info('Formulaire PFMP - À implémenter');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{ background: "#B45309", color: "#FEF3C7", border: "1px solid #92400E" }}
+                >
+                  <FileText size={13} /> Attestation PFMP
+                </button>
+              )}
             </>
           )}
           <button
